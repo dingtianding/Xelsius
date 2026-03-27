@@ -17,6 +17,7 @@ from app.models import (
     RunResponse,
     Transaction,
     UploadResponse,
+    Workpaper,
 )
 from app.tools import categorize as _categorize_reg  # noqa: F401 — registers tool
 from app.tools import anomalies as _anomalies_reg  # noqa: F401
@@ -55,15 +56,15 @@ def agent_run(
             )
 
     # 1. Build context + resolve prompt → tool call
-    transactions = adapter.get_transactions()
-    context = build_context(transactions, logger.get_log())
+    workpaper = adapter.get_workpaper()
+    context = build_context(workpaper.transactions, logger.get_log())
     try:
         tool_call = resolve_tool(req.prompt, user_api_key=user_key, context=context)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-    # 2. Tool: execute pure function → diff (reuse same transactions snapshot)
-    diff = execute(tool_call.tool, transactions, tool_call.args)
+    # 2. Tool: execute pure function → diff (reuse same workpaper snapshot)
+    diff = execute(tool_call.tool, workpaper, tool_call.args)
 
     # 3. Audit: log everything
     logger.record(
@@ -84,8 +85,8 @@ def agent_run(
 @app.post("/tools/run", response_model=RunResponse)
 def tools_run(req: DirectToolRequest) -> RunResponse:
     """Execute a tool directly — no AI, no rate limit. For preset buttons."""
-    transactions = adapter.get_transactions()
-    diff = execute(req.tool, transactions, req.args)
+    workpaper = adapter.get_workpaper()
+    diff = execute(req.tool, workpaper, req.args)
 
     logger.record(
         prompt=f"[direct] {req.tool.value}",
@@ -100,6 +101,11 @@ def tools_run(req: DirectToolRequest) -> RunResponse:
 @app.get("/transactions", response_model=list[Transaction])
 def get_transactions() -> list[Transaction]:
     return adapter.get_transactions()
+
+
+@app.get("/workpaper", response_model=Workpaper)
+def get_workpaper() -> Workpaper:
+    return adapter.get_workpaper()
 
 
 @app.post("/agent/apply", response_model=ApplyResponse)

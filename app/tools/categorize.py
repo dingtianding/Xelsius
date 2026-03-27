@@ -1,6 +1,6 @@
 from typing import Any
 
-from app.models import CellChange, ToolName, Transaction, UpdateCellsDiff
+from app.models import CellChange, ToolName, Workpaper, UpdateCellsDiff
 from app.tools.registry import register
 
 _KEYWORD_MAP: dict[str, str] = {
@@ -38,9 +38,9 @@ def _infer_category(description: str) -> str:
 
 
 @register(ToolName.CATEGORIZE_TRANSACTIONS)
-def categorize_transactions(transactions: list[Transaction], _args: dict[str, Any]) -> UpdateCellsDiff:
+def categorize_transactions(workpaper: Workpaper, _args: dict[str, Any]) -> UpdateCellsDiff:
     changes: list[CellChange] = []
-    for idx, txn in enumerate(transactions):
+    for idx, txn in enumerate(workpaper.transactions):
         new_category = _infer_category(txn.description)
         if new_category != txn.category:
             changes.append(

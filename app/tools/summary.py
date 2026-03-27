@@ -1,18 +1,18 @@
 from collections import defaultdict
 from typing import Any
 
-from app.models import CreateSheetDiff, ToolName, Transaction
+from app.models import CreateSheetDiff, ToolName, Workpaper
 from app.tools.registry import register
 
 
 @register(ToolName.CREATE_SUMMARY_SHEET)
-def create_summary_sheet(transactions: list[Transaction], args: dict[str, Any]) -> CreateSheetDiff:
+def create_summary_sheet(workpaper: Workpaper, args: dict[str, Any]) -> CreateSheetDiff:
     group_by: str = args.get("groupBy", "category")
 
     totals: dict[str, float] = defaultdict(float)
     counts: dict[str, int] = defaultdict(int)
 
-    for txn in transactions:
+    for txn in workpaper.transactions:
         key = getattr(txn, group_by, "Unknown")
         if not key:
             key = "Uncategorized"
