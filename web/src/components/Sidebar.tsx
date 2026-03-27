@@ -1,7 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import type { AuditEntry, CellChange, Diff } from "@/lib/types";
-import CommandBar from "./CommandBar";
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  diff?: Diff;
+  tool?: string;
+}
 
 interface SidebarProps {
   onPrompt: (prompt: string) => void;
@@ -24,8 +31,10 @@ export default function Sidebar({
   pendingChanges,
   onAcceptAll,
   onRejectAll,
-  auditLog,
 }: SidebarProps) {
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+
   const changeCount =
     pendingDiff?.type === "update_cells"
       ? pendingChanges.length
@@ -33,151 +42,210 @@ export default function Sidebar({
         ? pendingDiff.data.length
         : 0;
 
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = input.trim();
+    if (!trimmed || isLoading) return;
+
+    setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
+    setInput("");
+    onPrompt(trimmed);
+
+    // We'll add the assistant response via effect when diff arrives
+    setTimeout(() => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `Running analysis...`,
+        },
+      ]);
+    }, 100);
+  }
+
+  // Update last assistant message when diff arrives
+  if (
+    pendingDiff &&
+    messages.length > 0 &&
+    messages[messages.length - 1]?.role === "assistant" &&
+    !messages[messages.length - 1]?.diff
+  ) {
+    const toolLabel = pendingTool.replace(/_/g, " ");
+    setMessages((prev) => {
+      const next = [...prev];
+      next[next.length - 1] = {
+        role: "assistant",
+        content:
+          pendingDiff.type === "update_cells"
+            ? `I'll ${toolLabel}. This will update ${changeCount} cell${changeCount !== 1 ? "s" : ""}.`
+            : `I'll create a new "${pendingDiff.name}" sheet with ${changeCount} row${changeCount !== 1 ? "s" : ""}.`,
+        diff: pendingDiff,
+        tool: pendingTool,
+      };
+      return next;
+    });
+  }
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-[#0a1f1a]">
       {/* Header */}
-      <div className="px-4 py-4 border-b border-zinc-800">
-        <h2 className="text-sm font-semibold text-zinc-100 tracking-tight">
-          Xelsius Agent
-        </h2>
-        <p className="text-xs text-zinc-500 mt-0.5">
-          Describe what you want to do
-        </p>
+      <div className="px-4 py-3 border-b border-emerald-900/50">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-emerald-100">Xelsius</h2>
+          <span className="text-[10px] text-emerald-600 font-mono">agent</span>
+        </div>
       </div>
 
-      {/* Command Input */}
-      <div className="px-4 py-3 border-b border-zinc-800">
-        <CommandBar onSubmit={onPrompt} isLoading={isLoading} />
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div className="mx-4 mt-3 text-xs text-red-400 bg-red-400/10 border border-red-400/20 rounded px-3 py-2">
-          {error}
-        </div>
-      )}
-
-      {/* Pending Diff */}
-      {pendingDiff && changeCount > 0 && (
-        <div className="mx-4 mt-3 border border-emerald-500/30 bg-emerald-500/5 rounded-lg p-3">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <p className="text-xs font-medium text-emerald-400">
-                Proposed Changes
-              </p>
-              <p className="text-xs text-zinc-500 mt-0.5">
-                <span className="font-mono text-zinc-400">{pendingTool}</span>
-              </p>
-            </div>
-          </div>
-
-          <p className="text-xs text-zinc-400 mb-3">
-            {pendingDiff.type === "update_cells"
-              ? `${changeCount} cell${changeCount !== 1 ? "s" : ""} to update`
-              : `New sheet with ${changeCount} rows`}
-          </p>
-
-          {/* Summary for create_sheet */}
-          {pendingDiff.type === "create_sheet" && (
-            <div className="mb-3 max-h-32 overflow-y-auto rounded border border-zinc-700">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="bg-zinc-800 text-zinc-400">
-                    {Object.keys(pendingDiff.data[0] ?? {}).map((key) => (
-                      <th key={key} className="px-2 py-1 text-left font-medium">
-                        {key}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-800">
-                  {pendingDiff.data.map((row, i) => (
-                    <tr key={i} className="text-zinc-300">
-                      {Object.values(row).map((val, j) => (
-                        <td key={j} className="px-2 py-1 font-mono">
-                          {typeof val === "number"
-                            ? val.toLocaleString("en-US", {
-                                style: "currency",
-                                currency: "USD",
-                              })
-                            : val}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          <div className="flex gap-2">
-            <button
-              onClick={onAcceptAll}
-              className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded transition-colors"
-            >
-              Accept All
-            </button>
-            <button
-              onClick={onRejectAll}
-              className="flex-1 px-3 py-1.5 text-xs font-medium text-zinc-300 bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 rounded transition-colors"
-            >
-              Reject All
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Suggestions */}
-      {!pendingDiff && !isLoading && (
-        <div className="mx-4 mt-3">
-          <p className="text-xs text-zinc-500 mb-2">Try:</p>
-          <div className="flex flex-col gap-1.5">
-            {[
-              "Categorize all transactions",
-              "Summarize by category",
-              "Highlight transactions over $1000",
-            ].map((suggestion) => (
-              <button
-                key={suggestion}
-                onClick={() => onPrompt(suggestion)}
-                className="text-left text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded px-2 py-1.5 transition-colors font-mono"
-              >
-                &gt; {suggestion}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Audit Log */}
-      <div className="flex-1 mt-4 overflow-hidden flex flex-col">
-        <div className="px-4 py-2 border-t border-zinc-800">
-          <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wider">
-            History
-          </h3>
-        </div>
-        <div className="flex-1 overflow-y-auto px-4">
-          {auditLog.length === 0 ? (
-            <p className="text-xs text-zinc-600 italic py-2">No actions yet</p>
-          ) : (
-            <div className="flex flex-col gap-1 pb-4">
-              {auditLog.map((entry, i) => (
-                <div
-                  key={i}
-                  className="text-xs py-1.5 border-b border-zinc-800/50"
+      {/* Chat Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-3">
+        {messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <p className="text-xs text-emerald-700 mb-4">
+              Describe what you want to do with your data
+            </p>
+            <div className="flex flex-col gap-1.5 w-full">
+              {[
+                "Categorize all transactions",
+                "Summarize by category",
+                "Highlight transactions over $1000",
+              ].map((suggestion) => (
+                <button
+                  key={suggestion}
+                  onClick={() => {
+                    setInput(suggestion);
+                  }}
+                  className="text-left text-xs text-emerald-500/70 hover:text-emerald-300 hover:bg-emerald-900/30 rounded-md px-3 py-2 transition-colors border border-emerald-900/30 hover:border-emerald-700/50"
                 >
-                  <p className="text-zinc-300 truncate">&quot;{entry.prompt}&quot;</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-emerald-500 font-mono">{entry.tool}</span>
-                    <span className="text-zinc-600">
-                      {new Date(entry.timestamp).toLocaleTimeString()}
-                    </span>
-                  </div>
-                </div>
+                  {suggestion}
+                </button>
               ))}
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {messages.map((msg, i) => (
+              <div key={i}>
+                {msg.role === "user" ? (
+                  <div className="flex justify-end">
+                    <div className="bg-emerald-800/40 border border-emerald-700/30 rounded-lg px-3 py-2 max-w-[85%]">
+                      <p className="text-xs text-emerald-100">{msg.content}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex justify-start">
+                    <div className="bg-[#0d2a22] border border-emerald-900/40 rounded-lg px-3 py-2 max-w-[85%]">
+                      <p className="text-xs text-emerald-200/80">{msg.content}</p>
+
+                      {/* Diff actions */}
+                      {msg.diff && i === messages.length - 1 && pendingDiff && (
+                        <div className="flex gap-2 mt-2 pt-2 border-t border-emerald-900/40">
+                          <button
+                            onClick={onAcceptAll}
+                            className="flex-1 px-2 py-1 text-[11px] font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded transition-colors"
+                          >
+                            Accept
+                          </button>
+                          <button
+                            onClick={onRejectAll}
+                            className="flex-1 px-2 py-1 text-[11px] font-medium text-emerald-300 bg-emerald-900/50 hover:bg-emerald-800/50 border border-emerald-700/40 rounded transition-colors"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Summary table for create_sheet */}
+                      {msg.diff?.type === "create_sheet" && (
+                        <div className="mt-2 max-h-32 overflow-y-auto rounded border border-emerald-900/40">
+                          <table className="w-full text-[11px]">
+                            <thead>
+                              <tr className="bg-emerald-900/30 text-emerald-500">
+                                {Object.keys(msg.diff.data[0] ?? {}).map((key) => (
+                                  <th key={key} className="px-2 py-1 text-left font-medium">
+                                    {key}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-emerald-900/30">
+                              {msg.diff.data.map((row, ri) => (
+                                <tr key={ri} className="text-emerald-200/70">
+                                  {Object.values(row).map((val, ci) => (
+                                    <td key={ci} className="px-2 py-1 font-mono">
+                                      {typeof val === "number"
+                                        ? val.toLocaleString("en-US", {
+                                            style: "currency",
+                                            currency: "USD",
+                                          })
+                                        : val}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="bg-[#0d2a22] border border-emerald-900/40 rounded-lg px-3 py-2">
+                  <div className="flex gap-1">
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Error */}
+        {error && (
+          <div className="mt-3 text-xs text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
+            {error}
+          </div>
+        )}
+      </div>
+
+      {/* Chat Input */}
+      <div className="px-3 py-3 border-t border-emerald-900/50">
+        <form onSubmit={handleSubmit}>
+          <div className="bg-[#0d2a22] border border-emerald-800/40 rounded-lg overflow-hidden focus-within:border-emerald-600 transition-colors">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit(e);
+                }
+              }}
+              placeholder="Describe an action..."
+              disabled={isLoading}
+              rows={3}
+              className="w-full px-3 pt-2.5 pb-1 bg-transparent text-xs text-emerald-100 placeholder:text-emerald-700 focus:outline-none resize-none disabled:opacity-50"
+            />
+            <div className="flex items-center justify-between px-3 pb-2">
+              <span className="text-[10px] text-emerald-800">
+                Enter to send
+              </span>
+              <button
+                type="submit"
+                disabled={isLoading || !input.trim()}
+                className="px-2.5 py-1 text-[11px] font-medium text-emerald-100 bg-emerald-700 hover:bg-emerald-600 disabled:bg-emerald-900/50 disabled:text-emerald-800 rounded transition-colors"
+              >
+                {isLoading ? "..." : "Send"}
+              </button>
+            </div>
+          </div>
+        </form>
       </div>
     </div>
   );

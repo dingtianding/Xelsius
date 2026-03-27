@@ -144,35 +144,27 @@ export default function Home() {
 
   return (
     <div className="flex h-screen">
-      {/* Spreadsheet Area */}
+      {/* Spreadsheet Area — full height, no top bar */}
       <div className="flex-1 flex flex-col min-w-0">
-        <div className="flex items-center px-5 py-3 border-b border-zinc-800 bg-zinc-900/50">
-          <h1 className="text-sm font-semibold text-zinc-100 tracking-tight">
-            Xelsius
-          </h1>
-          <span className="ml-2 text-xs text-zinc-600">Transactions</span>
-        </div>
-        <div className="flex-1 p-4 overflow-auto">
-          <SpreadsheetGrid
-            transactions={transactions}
-            pendingChanges={pendingChanges}
-            onAcceptChange={handleAcceptChange}
-            onRejectChange={handleRejectChange}
-            onCellEdit={handleCellEdit}
-          />
-        </div>
+        <SpreadsheetGrid
+          transactions={transactions}
+          pendingChanges={pendingChanges}
+          onAcceptChange={handleAcceptChange}
+          onRejectChange={handleRejectChange}
+          onCellEdit={handleCellEdit}
+        />
       </div>
 
       {/* Resize Handle */}
       <div
         onMouseDown={handleMouseDown}
-        className="w-1 cursor-col-resize bg-zinc-800 hover:bg-emerald-500 active:bg-emerald-400 transition-colors flex-shrink-0"
+        className="w-1 cursor-col-resize bg-emerald-900/40 hover:bg-emerald-500 active:bg-emerald-400 transition-colors flex-shrink-0"
       />
 
       {/* Sidebar */}
       <div
         style={{ width: sidebarWidth }}
-        className="border-l border-zinc-800 bg-zinc-900/30 flex-shrink-0 overflow-hidden"
+        className="border-l border-emerald-900/30 flex-shrink-0 overflow-hidden"
       >
         <Sidebar
           onPrompt={handlePrompt}
