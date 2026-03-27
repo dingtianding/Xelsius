@@ -10,12 +10,14 @@ Request → Agent → Tool → Adapter → Diff → Audit Log → Response
 
 | Layer | Location | Role |
 |-------|----------|------|
-| Agent | `app/agent/service.py` | Resolves natural language → structured tool call (rule-based, LLM later) |
+| Agent | `app/agent/service.py` | LLM-powered intent router — ONLY outputs `{ tool, args }` |
 | Tools | `app/tools/` | Pure functions that compute diffs (no side effects) |
+| Ingest | `app/ingest/` | File parsing: `data.py` (CSV/Excel), `ocr.py` (image/PDF via vision) |
 | Adapters | `app/adapters/` | Interface to data sources (in-memory for now) |
+| Rate Limit | `app/ratelimit.py` | IP-based free tier (10 req/24h), BYOK unlimited |
 | Audit | `app/audit/logger.py` | Logs every prompt, tool, args, diff, timestamp |
-| API | `app/main.py` | FastAPI — `POST /agent/run`, `GET /audit/log` |
-| Frontend | `web/` | Next.js (App Router, TypeScript, Tailwind) |
+| API | `app/main.py` | FastAPI endpoints (see below) |
+| Frontend | `web/` | Next.js (App Router, TypeScript, Tailwind, AG Grid) |
 
 ## Backend (FastAPI)
 
@@ -25,15 +27,19 @@ Request → Agent → Tool → Adapter → Diff → Audit Log → Response
 - All tools return diffs (`update_cells` or `create_sheet`), never mutate data
 - Models in `app/models.py` (Pydantic)
 
-### API shape
+### API endpoints
 
 ```
-POST /agent/run  { "prompt": "..." }
-→ { "tool": "...", "args": {...}, "diff": {...} }
-
-GET /audit/log
-→ [{ "prompt", "tool", "args", "diff", "timestamp" }, ...]
+GET  /transactions           → Transaction[]
+POST /agent/run              { "prompt", "api_key?" } → { tool, args, diff, remaining? }
+POST /agent/apply            { "diff" } → { transactions }
+POST /ingest/data            multipart file (CSV/Excel) → { transactions, count }
+POST /ingest/ocr             multipart file (image/PDF) → { transactions, count }
+GET  /audit/log              → AuditEntry[]
 ```
+
+- `x-api-key` header or `api_key` body field for BYOK
+- Free tier: 10 requests/24h per IP (configurable via `XELSIUS_FREE_LIMIT`)
 
 ## Frontend (Next.js)
 
@@ -41,12 +47,20 @@ GET /audit/log
 - App Router, TypeScript, Tailwind
 - Will show: transaction table, prompt input, diff preview, apply button, audit log
 
+## Execution Model
+
+- Agent ONLY selects tool + args (non-deterministic, uses LLM)
+- Tools perform ALL computation deterministically (pure functions, no LLM)
+- Agent NEVER generates diffs, modifies data, or computes aggregates
+- AI is a router, NOT part of the data pipeline
+
 ## Core Principles
 
 1. System NEVER directly mutates data
-2. Always returns a proposed diff
-3. Deterministic and auditable
+2. Always returns a proposed diff for human review
+3. Tools are deterministic and auditable — same input, same output
 4. Adapter-based (not tied to any UI or spreadsheet)
+5. AI hallucination is impossible because AI never touches data
 
 ## Project Plan
 
