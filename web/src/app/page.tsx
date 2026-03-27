@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import SpreadsheetGrid from "@/components/SpreadsheetGrid";
 import Sidebar from "@/components/Sidebar";
 import { runAgent } from "@/lib/api";
@@ -110,6 +110,38 @@ export default function Home() {
     [],
   );
 
+  // --- Resizable sidebar ---
+  const [sidebarWidth, setSidebarWidth] = useState(320);
+  const isDragging = useRef(false);
+  const startX = useRef(0);
+  const startWidth = useRef(320);
+
+  function handleMouseDown(e: React.MouseEvent) {
+    isDragging.current = true;
+    startX.current = e.clientX;
+    startWidth.current = sidebarWidth;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    function onMouseMove(ev: MouseEvent) {
+      if (!isDragging.current) return;
+      const delta = startX.current - ev.clientX;
+      const newWidth = Math.min(Math.max(startWidth.current + delta, 240), 600);
+      setSidebarWidth(newWidth);
+    }
+
+    function onMouseUp() {
+      isDragging.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    }
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }
+
   return (
     <div className="flex h-screen">
       {/* Spreadsheet Area */}
@@ -131,8 +163,17 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Resize Handle */}
+      <div
+        onMouseDown={handleMouseDown}
+        className="w-1 cursor-col-resize bg-zinc-800 hover:bg-emerald-500 active:bg-emerald-400 transition-colors flex-shrink-0"
+      />
+
       {/* Sidebar */}
-      <div className="w-80 border-l border-zinc-800 bg-zinc-900/30 flex-shrink-0 overflow-hidden">
+      <div
+        style={{ width: sidebarWidth }}
+        className="border-l border-zinc-800 bg-zinc-900/30 flex-shrink-0 overflow-hidden"
+      >
         <Sidebar
           onPrompt={handlePrompt}
           isLoading={isLoading}
