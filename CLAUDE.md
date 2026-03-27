@@ -67,8 +67,16 @@ GET  /audit/log              → AuditEntry[]
 - Phase 1: Full-stack web demo (portfolio piece)
 - Phase 2: Google Sheets sidebar addon
 
+## Testing
+
+- `python -m pytest app/ -v` — 38 tests, ~1s
+- Tests colocated with source (`*_test.py`)
+- Claude API mocked in integration tests — no API key needed for CI
+- CI: `.github/workflows/backend.yml` (Python 3.11, runs on push/PR to main)
+
 ## Stack
 
-- Backend: Python / FastAPI / Pydantic
-- Frontend: Next.js / TypeScript / Tailwind
+- Backend: Python / FastAPI / Pydantic / Anthropic SDK
+- Frontend: Next.js / TypeScript / Tailwind / AG Grid
 - No database yet (in-memory)
+- LLM: Claude Haiku 4.5 (default, configurable via `XELSIUS_MODEL`)
