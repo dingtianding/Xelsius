@@ -58,6 +58,19 @@ _TOOLS = [
             "required": [],
         },
     },
+    {
+        "name": ToolName.RESET_TRANSACTIONS.value,
+        "description": (
+            "Clear all category assignments, resetting every transaction's category "
+            "to blank. Use when the user wants to start over, wipe categories, "
+            "reset, or clear everything."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
 ]
 
 _SYSTEM = (

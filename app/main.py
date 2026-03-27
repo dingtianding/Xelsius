@@ -11,6 +11,7 @@ from app.models import (
     AuditEntry,
     ApplyRequest,
     ApplyResponse,
+    DirectToolRequest,
     RunRequest,
     RunResponse,
     Transaction,
@@ -19,6 +20,7 @@ from app.models import (
 from app.tools import categorize as _categorize_reg  # noqa: F401 — registers tool
 from app.tools import anomalies as _anomalies_reg  # noqa: F401
 from app.tools import summary as _summary_reg  # noqa: F401
+from app.tools import reset as _reset_reg  # noqa: F401
 from app.tools.registry import execute
 
 app = FastAPI(title="Xelsius", version="0.1.0")
@@ -75,6 +77,22 @@ def agent_run(
         diff=diff,
         remaining=remaining,
     )
+
+
+@app.post("/tools/run", response_model=RunResponse)
+def tools_run(req: DirectToolRequest) -> RunResponse:
+    """Execute a tool directly — no AI, no rate limit. For preset buttons."""
+    transactions = adapter.get_transactions()
+    diff = execute(req.tool, transactions, req.args)
+
+    logger.record(
+        prompt=f"[direct] {req.tool.value}",
+        tool=req.tool.value,
+        args=req.args,
+        diff=diff,
+    )
+
+    return RunResponse(tool=req.tool.value, args=req.args, diff=diff)
 
 
 @app.get("/transactions", response_model=list[Transaction])

@@ -137,6 +137,45 @@ def test_ingest_unsupported_type():
     assert resp.status_code == 400
 
 
+# --- POST /tools/run (direct, no AI) ---
+
+
+def test_direct_tool_categorize():
+    resp = client.post("/tools/run", json={"tool": "categorize_transactions", "args": {}})
+    assert resp.status_code == 200
+    assert resp.json()["tool"] == "categorize_transactions"
+    assert resp.json()["diff"]["type"] == "update_cells"
+
+
+def test_direct_tool_no_rate_limit():
+    """Direct calls should never hit rate limit."""
+    for _ in range(ratelimit._FREE_LIMIT + 5):
+        resp = client.post("/tools/run", json={"tool": "categorize_transactions", "args": {}})
+        assert resp.status_code == 200
+
+
+def test_direct_tool_reset():
+    # First categorize, then reset
+    adapter.load_transactions([
+        Transaction(date="2026-01-01", description="Uber", amount=45.0, category="Travel"),
+    ])
+    resp = client.post("/tools/run", json={"tool": "reset_transactions", "args": {}})
+    assert resp.status_code == 200
+    assert resp.json()["diff"]["changes"][0]["after"] == ""
+
+
+def test_direct_tool_logs_audit():
+    client.post("/tools/run", json={"tool": "categorize_transactions", "args": {}})
+    log = client.get("/audit/log").json()
+    assert len(log) == 1
+    assert log[0]["prompt"].startswith("[direct]")
+
+
+def test_direct_tool_invalid_name():
+    resp = client.post("/tools/run", json={"tool": "nonexistent_tool", "args": {}})
+    assert resp.status_code == 422
+
+
 # --- GET /audit/log ---
 
 

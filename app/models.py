@@ -24,6 +24,7 @@ class ToolName(str, Enum):
     CATEGORIZE_TRANSACTIONS = "categorize_transactions"
     CREATE_SUMMARY_SHEET = "create_summary_sheet"
     HIGHLIGHT_ANOMALIES = "highlight_anomalies"
+    RESET_TRANSACTIONS = "reset_transactions"
 
 
 class ToolCall(BaseModel):
@@ -69,6 +70,11 @@ class ApplyRequest(BaseModel):
 
 class ApplyResponse(BaseModel):
     transactions: list[Transaction]
+
+
+class DirectToolRequest(BaseModel):
+    tool: ToolName
+    args: dict[str, Any] = Field(default_factory=dict)
 
 
 class RunRequest(BaseModel):
