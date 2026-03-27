@@ -28,6 +28,9 @@ class MemoryAdapter(SpreadsheetAdapter):
     def get_transactions(self) -> list[Transaction]:
         return [t.model_copy() for t in self._transactions]
 
+    def load_transactions(self, transactions: list[Transaction]) -> None:
+        self._transactions = [t.model_copy() for t in transactions]
+
     def apply_diff(self, diff: Diff) -> None:
         if isinstance(diff, UpdateCellsDiff):
             for change in diff.changes:

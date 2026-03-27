@@ -58,6 +58,11 @@ Diff = UpdateCellsDiff | CreateSheetDiff
 # --- API ---
 
 
+class UploadResponse(BaseModel):
+    transactions: list[Transaction]
+    count: int
+
+
 class RunRequest(BaseModel):
     prompt: str
     api_key: str | None = None
