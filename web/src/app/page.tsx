@@ -1,10 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import CommandBar from "@/components/CommandBar";
-import TransactionTable from "@/components/TransactionTable";
-import DiffPreview from "@/components/DiffPreview";
-import AuditLog from "@/components/AuditLog";
+import { useCallback, useState } from "react";
+import SpreadsheetGrid from "@/components/SpreadsheetGrid";
+import Sidebar from "@/components/Sidebar";
 import { runAgent } from "@/lib/api";
 import { SAMPLE_TRANSACTIONS } from "@/lib/sample-data";
 import type { Transaction, Diff, CellChange, AuditEntry } from "@/lib/types";
@@ -13,22 +11,24 @@ export default function Home() {
   const [transactions, setTransactions] = useState<Transaction[]>(SAMPLE_TRANSACTIONS);
   const [pendingDiff, setPendingDiff] = useState<Diff | null>(null);
   const [pendingTool, setPendingTool] = useState("");
+  const [pendingChanges, setPendingChanges] = useState<CellChange[]>([]);
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const pendingChanges: CellChange[] =
-    pendingDiff?.type === "update_cells" ? pendingDiff.changes : [];
 
   async function handlePrompt(prompt: string) {
     setError("");
     setIsLoading(true);
     setPendingDiff(null);
+    setPendingChanges([]);
 
     try {
       const res = await runAgent(prompt);
       setPendingDiff(res.diff);
       setPendingTool(res.tool);
+      if (res.diff.type === "update_cells") {
+        setPendingChanges(res.diff.changes);
+      }
       setAuditLog((prev) => [
         {
           prompt,
@@ -46,61 +46,93 @@ export default function Home() {
     }
   }
 
-  function handleApply() {
-    if (!pendingDiff) return;
+  const handleAcceptChange = useCallback((change: CellChange) => {
+    setTransactions((prev) => {
+      const next = prev.map((t) => ({ ...t }));
+      (next[change.row] as Record<string, string | number>)[change.column] = change.after;
+      return next;
+    });
+    setPendingChanges((prev) => {
+      const next = prev.filter(
+        (c) => !(c.row === change.row && c.column === change.column)
+      );
+      if (next.length === 0) {
+        setPendingDiff(null);
+        setPendingTool("");
+      }
+      return next;
+    });
+  }, []);
 
-    if (pendingDiff.type === "update_cells") {
+  const handleRejectChange = useCallback((change: CellChange) => {
+    setPendingChanges((prev) => {
+      const next = prev.filter(
+        (c) => !(c.row === change.row && c.column === change.column)
+      );
+      if (next.length === 0) {
+        setPendingDiff(null);
+        setPendingTool("");
+      }
+      return next;
+    });
+  }, []);
+
+  function handleAcceptAll() {
+    if (pendingDiff?.type === "update_cells") {
       setTransactions((prev) => {
         const next = prev.map((t) => ({ ...t }));
-        for (const change of pendingDiff.changes) {
+        for (const change of pendingChanges) {
           (next[change.row] as Record<string, string | number>)[change.column] =
             change.after;
         }
         return next;
       });
     }
-
     setPendingDiff(null);
     setPendingTool("");
+    setPendingChanges([]);
   }
 
-  function handleReject() {
+  function handleRejectAll() {
     setPendingDiff(null);
     setPendingTool("");
+    setPendingChanges([]);
   }
 
   return (
-    <main className="max-w-5xl mx-auto px-6 py-10 flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold text-zinc-100 tracking-tight">Xelsius</h1>
-        <p className="text-sm text-zinc-400 mt-1">
-          Describe what you want to do. Review the diff. Apply when ready.
-        </p>
+    <div className="flex h-screen">
+      {/* Spreadsheet Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex items-center px-5 py-3 border-b border-zinc-800 bg-zinc-900/50">
+          <h1 className="text-sm font-semibold text-zinc-100 tracking-tight">
+            Xelsius
+          </h1>
+          <span className="ml-2 text-xs text-zinc-600">Transactions</span>
+        </div>
+        <div className="flex-1 p-4 overflow-auto">
+          <SpreadsheetGrid
+            transactions={transactions}
+            pendingChanges={pendingChanges}
+            onAcceptChange={handleAcceptChange}
+            onRejectChange={handleRejectChange}
+          />
+        </div>
       </div>
 
-      <CommandBar onSubmit={handlePrompt} isLoading={isLoading} />
-
-      {error && (
-        <div className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-2.5">
-          {error}
-        </div>
-      )}
-
-      {pendingDiff && (
-        <DiffPreview
-          diff={pendingDiff}
-          tool={pendingTool}
-          onApply={handleApply}
-          onReject={handleReject}
+      {/* Sidebar */}
+      <div className="w-80 border-l border-zinc-800 bg-zinc-900/30 flex-shrink-0 overflow-hidden">
+        <Sidebar
+          onPrompt={handlePrompt}
+          isLoading={isLoading}
+          error={error}
+          pendingDiff={pendingDiff}
+          pendingTool={pendingTool}
+          pendingChanges={pendingChanges}
+          onAcceptAll={handleAcceptAll}
+          onRejectAll={handleRejectAll}
+          auditLog={auditLog}
         />
-      )}
-
-      <TransactionTable
-        transactions={transactions}
-        pendingChanges={pendingChanges}
-      />
-
-      <AuditLog entries={auditLog} />
-    </main>
+      </div>
+    </div>
   );
 }
