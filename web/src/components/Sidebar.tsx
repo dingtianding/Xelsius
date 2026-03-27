@@ -22,6 +22,15 @@ interface SidebarProps {
   auditLog: AuditEntry[];
 }
 
+type Mode = "agent" | "chat";
+
+const MODELS = [
+  { id: "auto", label: "Auto" },
+  { id: "claude-haiku-4-5", label: "Haiku 4.5" },
+  { id: "claude-sonnet-4-5", label: "Sonnet 4.5" },
+  { id: "claude-opus-4", label: "Opus 4" },
+];
+
 export default function Sidebar({
   onPrompt,
   isLoading,
@@ -34,6 +43,8 @@ export default function Sidebar({
 }: SidebarProps) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [mode, setMode] = useState<Mode>("agent");
+  const [model, setModel] = useState("auto");
 
   const changeCount =
     pendingDiff?.type === "update_cells"
@@ -91,16 +102,49 @@ export default function Sidebar({
       {/* Header */}
       <div className="px-4 py-3 border-b border-emerald-900/50">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-white">Xelsius</h2>
-          <span className="text-[10px] text-zinc-400 font-mono">agent</span>
+          <h2 className="text-base font-semibold text-white">Xelsius</h2>
+          <span className="text-xs text-zinc-400 font-mono">agent</span>
         </div>
+      </div>
+
+      {/* Mode + Model selectors */}
+      <div className="flex items-center gap-3 px-4 py-2 border-b border-emerald-900/50">
+        {/* Mode toggle */}
+        <div className="flex bg-emerald-900/40 rounded-md p-0.5">
+          {(["agent", "chat"] as Mode[]).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={`px-3 py-1 text-xs font-medium rounded transition-colors capitalize ${
+                mode === m
+                  ? "bg-emerald-700 text-white"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+
+        {/* Model selector */}
+        <select
+          value={model}
+          onChange={(e) => setModel(e.target.value)}
+          className="bg-emerald-900/40 border border-emerald-800/40 text-zinc-300 text-xs rounded px-2 py-1 focus:outline-none focus:border-emerald-600 cursor-pointer"
+        >
+          {MODELS.map((m) => (
+            <option key={m.id} value={m.id} className="bg-[#0a1f1a]">
+              {m.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-3">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
-            <p className="text-xs text-zinc-500 mb-4">
+            <p className="text-sm text-zinc-500 mb-4">
               Describe what you want to do with your data
             </p>
             <div className="flex flex-col gap-1.5 w-full">
@@ -114,7 +158,7 @@ export default function Sidebar({
                   onClick={() => {
                     setInput(suggestion);
                   }}
-                  className="text-left text-xs text-zinc-300 hover:text-zinc-200 hover:bg-emerald-900/30 rounded-md px-3 py-2 transition-colors border border-emerald-900/30 hover:border-emerald-700/50"
+                  className="text-left text-sm text-zinc-300 hover:text-zinc-200 hover:bg-emerald-900/30 rounded-md px-3 py-2.5 transition-colors border border-emerald-900/30 hover:border-emerald-700/50"
                 >
                   {suggestion}
                 </button>
@@ -128,26 +172,26 @@ export default function Sidebar({
                 {msg.role === "user" ? (
                   <div className="flex justify-end">
                     <div className="bg-emerald-800/40 border border-emerald-700/30 rounded-lg px-3 py-2 max-w-[85%]">
-                      <p className="text-xs text-white">{msg.content}</p>
+                      <p className="text-sm text-white">{msg.content}</p>
                     </div>
                   </div>
                 ) : (
                   <div className="flex justify-start">
                     <div className="bg-[#0d2a22] border border-emerald-900/40 rounded-lg px-3 py-2 max-w-[85%]">
-                      <p className="text-xs text-zinc-200">{msg.content}</p>
+                      <p className="text-sm text-zinc-200">{msg.content}</p>
 
                       {/* Diff actions */}
                       {msg.diff && i === messages.length - 1 && pendingDiff && (
                         <div className="flex gap-2 mt-2 pt-2 border-t border-emerald-900/40">
                           <button
                             onClick={onAcceptAll}
-                            className="flex-1 px-2 py-1 text-[11px] font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded transition-colors"
+                            className="flex-1 px-2 py-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded transition-colors"
                           >
                             Accept
                           </button>
                           <button
                             onClick={onRejectAll}
-                            className="flex-1 px-2 py-1 text-[11px] font-medium text-zinc-200 bg-emerald-900/50 hover:bg-emerald-800/50 border border-emerald-700/40 rounded transition-colors"
+                            className="flex-1 px-2 py-1 text-xs font-medium text-zinc-200 bg-emerald-900/50 hover:bg-emerald-800/50 border border-emerald-700/40 rounded transition-colors"
                           >
                             Reject
                           </button>
@@ -157,7 +201,7 @@ export default function Sidebar({
                       {/* Summary table for create_sheet */}
                       {msg.diff?.type === "create_sheet" && (
                         <div className="mt-2 max-h-32 overflow-y-auto rounded border border-emerald-900/40">
-                          <table className="w-full text-[11px]">
+                          <table className="w-full text-xs">
                             <thead>
                               <tr className="bg-emerald-900/30 text-zinc-400">
                                 {Object.keys(msg.diff.data[0] ?? {}).map((key) => (
@@ -230,16 +274,16 @@ export default function Sidebar({
               placeholder="Describe an action..."
               disabled={isLoading}
               rows={3}
-              className="w-full px-3 pt-2.5 pb-1 bg-transparent text-xs text-white placeholder:text-zinc-500 focus:outline-none resize-none disabled:opacity-50"
+              className="w-full px-3 pt-2.5 pb-1 bg-transparent text-sm text-white placeholder:text-zinc-500 focus:outline-none resize-none disabled:opacity-50"
             />
             <div className="flex items-center justify-between px-3 pb-2">
-              <span className="text-[10px] text-zinc-500">
+              <span className="text-xs text-zinc-500">
                 Enter to send
               </span>
               <button
                 type="submit"
                 disabled={isLoading || !input.trim()}
-                className="px-2.5 py-1 text-[11px] font-medium text-white bg-emerald-700 hover:bg-emerald-600 disabled:bg-emerald-900/50 disabled:text-zinc-500 rounded transition-colors"
+                className="px-3 py-1.5 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-600 disabled:bg-emerald-900/50 disabled:text-zinc-500 rounded transition-colors"
               >
                 {isLoading ? "..." : "Send"}
               </button>
