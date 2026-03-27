@@ -1,4 +1,4 @@
-import type { AuditEntry, RunResponse } from "./types";
+import type { AuditEntry, RunResponse, UploadResponse } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8888";
 
@@ -11,6 +11,21 @@ export async function runAgent(prompt: string): Promise<RunResponse> {
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Request failed" }));
     throw new Error(err.detail ?? "Request failed");
+  }
+  return res.json();
+}
+
+export async function uploadFile(file: File): Promise<UploadResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`${API_BASE}/ingest/data`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Upload failed" }));
+    throw new Error(err.detail ?? "Upload failed");
   }
   return res.json();
 }

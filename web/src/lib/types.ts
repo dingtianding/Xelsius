@@ -31,6 +31,11 @@ export interface RunResponse {
   diff: Diff;
 }
 
+export interface UploadResponse {
+  transactions: Transaction[];
+  count: number;
+}
+
 export interface AuditEntry {
   prompt: string;
   tool: string;

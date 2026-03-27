@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { AuditEntry, CellChange, Diff } from "@/lib/types";
+import FileUpload from "./FileUpload";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -20,6 +21,8 @@ interface SidebarProps {
   onAcceptAll: () => void;
   onRejectAll: () => void;
   auditLog: AuditEntry[];
+  onFileUpload: (file: File) => void;
+  isUploading: boolean;
 }
 
 type Mode = "agent" | "chat";
@@ -40,6 +43,8 @@ export default function Sidebar({
   pendingChanges,
   onAcceptAll,
   onRejectAll,
+  onFileUpload,
+  isUploading,
 }: SidebarProps) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -143,26 +148,33 @@ export default function Sidebar({
       {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-3">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <p className="text-sm text-zinc-500 mb-4">
-              Describe what you want to do with your data
-            </p>
-            <div className="flex flex-col gap-1.5 w-full">
-              {[
-                "Categorize all transactions",
-                "Summarize by category",
-                "Highlight transactions over $1000",
-              ].map((suggestion) => (
-                <button
-                  key={suggestion}
-                  onClick={() => {
-                    setInput(suggestion);
-                  }}
-                  className="text-left text-sm text-zinc-300 hover:text-zinc-200 hover:bg-emerald-900/30 rounded-md px-3 py-2.5 transition-colors border border-emerald-900/30 hover:border-emerald-700/50"
-                >
-                  {suggestion}
-                </button>
-              ))}
+          <div className="flex flex-col items-center justify-center h-full text-center gap-5">
+            {/* File Upload */}
+            <div className="w-full">
+              <p className="text-xs text-zinc-500 mb-2 text-left">Load data</p>
+              <FileUpload onUpload={onFileUpload} isUploading={isUploading} />
+            </div>
+
+            {/* Suggestions */}
+            <div className="w-full">
+              <p className="text-xs text-zinc-500 mb-2 text-left">Or try a command</p>
+              <div className="flex flex-col gap-1.5">
+                {[
+                  "Categorize all transactions",
+                  "Summarize by category",
+                  "Highlight transactions over $1000",
+                ].map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    onClick={() => {
+                      setInput(suggestion);
+                    }}
+                    className="text-left text-sm text-zinc-300 hover:text-zinc-200 hover:bg-emerald-900/30 rounded-md px-3 py-2.5 transition-colors border border-emerald-900/30 hover:border-emerald-700/50"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         ) : (

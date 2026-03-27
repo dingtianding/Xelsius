@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import SpreadsheetGrid from "@/components/SpreadsheetGrid";
 import Sidebar from "@/components/Sidebar";
-import { runAgent } from "@/lib/api";
+import { runAgent, uploadFile } from "@/lib/api";
 import { SAMPLE_TRANSACTIONS } from "@/lib/sample-data";
 import type { Transaction, Diff, CellChange, AuditEntry } from "@/lib/types";
 
@@ -14,6 +14,7 @@ export default function Home() {
   const [pendingChanges, setPendingChanges] = useState<CellChange[]>([]);
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState("");
 
   async function handlePrompt(prompt: string) {
@@ -110,6 +111,21 @@ export default function Home() {
     [],
   );
 
+  async function handleFileUpload(file: File) {
+    setError("");
+    setIsUploading(true);
+    try {
+      const res = await uploadFile(file);
+      setTransactions(res.transactions);
+      setPendingDiff(null);
+      setPendingChanges([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
   // --- Resizable sidebar ---
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const isDragging = useRef(false);
@@ -176,6 +192,8 @@ export default function Home() {
           onAcceptAll={handleAcceptAll}
           onRejectAll={handleRejectAll}
           auditLog={auditLog}
+          onFileUpload={handleFileUpload}
+          isUploading={isUploading}
         />
       </div>
     </div>
