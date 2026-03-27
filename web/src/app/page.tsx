@@ -99,6 +99,17 @@ export default function Home() {
     setPendingChanges([]);
   }
 
+  const handleCellEdit = useCallback(
+    (rowIndex: number, column: string, value: string | number) => {
+      setTransactions((prev) => {
+        const next = prev.map((t) => ({ ...t }));
+        (next[rowIndex] as Record<string, string | number>)[column] = value;
+        return next;
+      });
+    },
+    [],
+  );
+
   return (
     <div className="flex h-screen">
       {/* Spreadsheet Area */}
@@ -115,6 +126,7 @@ export default function Home() {
             pendingChanges={pendingChanges}
             onAcceptChange={handleAcceptChange}
             onRejectChange={handleRejectChange}
+            onCellEdit={handleCellEdit}
           />
         </div>
       </div>

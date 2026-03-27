@@ -8,6 +8,7 @@ import {
   type ColDef,
   type CellClassRules,
   type ICellRendererParams,
+  type CellEditingStoppedEvent,
 } from "ag-grid-community";
 import type { Transaction, CellChange } from "@/lib/types";
 
@@ -18,6 +19,7 @@ interface SpreadsheetGridProps {
   pendingChanges: CellChange[];
   onAcceptChange: (change: CellChange) => void;
   onRejectChange: (change: CellChange) => void;
+  onCellEdit: (rowIndex: number, column: string, value: string | number) => void;
 }
 
 function DiffCellRenderer(props: ICellRendererParams) {
@@ -78,6 +80,7 @@ export default function SpreadsheetGrid({
   pendingChanges,
   onAcceptChange,
   onRejectChange,
+  onCellEdit,
 }: SpreadsheetGridProps) {
   const changeMap = useMemo(() => {
     const map = new Map<number, Map<string, CellChange>>();
@@ -129,6 +132,7 @@ export default function SpreadsheetGrid({
         field: "date",
         headerName: "Date",
         width: 120,
+        editable: (params) => !params.data?._changes?.["date"],
         cellRenderer: DiffCellRenderer,
         cellClassRules: diffCellClassRules,
       },
@@ -137,6 +141,7 @@ export default function SpreadsheetGrid({
         headerName: "Description",
         flex: 2,
         minWidth: 200,
+        editable: (params) => !params.data?._changes?.["description"],
         cellRenderer: DiffCellRenderer,
         cellClassRules: diffCellClassRules,
       },
@@ -144,6 +149,7 @@ export default function SpreadsheetGrid({
         field: "amount",
         headerName: "Amount",
         width: 130,
+        editable: (params) => !params.data?._changes?.["amount"],
         cellRenderer: DiffCellRenderer,
         cellClassRules: diffCellClassRules,
       },
@@ -152,12 +158,21 @@ export default function SpreadsheetGrid({
         headerName: "Category",
         flex: 1,
         minWidth: 160,
+        editable: (params) => !params.data?._changes?.["category"],
         cellRenderer: DiffCellRenderer,
         cellClassRules: diffCellClassRules,
       },
     ],
     [diffCellClassRules],
   );
+
+  function handleCellEditStopped(event: CellEditingStoppedEvent) {
+    if (!event.valueChanged || !event.colDef.field) return;
+    const rowIndex: number = event.data._rowIndex;
+    const field = event.colDef.field;
+    const value = field === "amount" ? Number(event.newValue) : event.newValue;
+    onCellEdit(rowIndex, field, value);
+  }
 
   return (
     <div className="ag-theme-alpine-dark w-full h-full rounded-lg overflow-hidden border border-zinc-700">
@@ -167,8 +182,10 @@ export default function SpreadsheetGrid({
         headerHeight={36}
         rowHeight={40}
         domLayout="autoHeight"
-        suppressCellFocus={true}
+        suppressCellFocus={false}
         suppressRowHoverHighlight={false}
+        singleClickEdit={false}
+        onCellEditingStopped={handleCellEditStopped}
       />
     </div>
   );
