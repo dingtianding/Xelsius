@@ -73,10 +73,12 @@ _TOOLS = [
     },
 ]
 
-_SYSTEM = (
+_SYSTEM_BASE = (
     "You are Xelsius, an AI accounting assistant. The user will describe what "
     "they want done with their financial transactions. Pick the single best tool "
-    "and supply the correct arguments. Do not explain — just call the tool."
+    "and supply the correct arguments. Use the data context below to choose "
+    "smarter arguments (e.g., thresholds based on actual amounts). "
+    "Do not explain — just call the tool."
 )
 
 _host_client: anthropic.Anthropic | None = None
@@ -99,14 +101,16 @@ def _get_client(user_api_key: str | None = None) -> anthropic.Anthropic:
     return _get_host_client()
 
 
-def resolve_tool(prompt: str, user_api_key: str | None = None) -> ToolCall:
+def resolve_tool(prompt: str, user_api_key: str | None = None, context: str = "") -> ToolCall:
     """Use Claude to map a natural-language prompt to a structured tool call."""
     client = _get_client(user_api_key)
+
+    system = f"{_SYSTEM_BASE}\n\n{context}" if context else _SYSTEM_BASE
 
     response = client.messages.create(
         model=os.environ.get("XELSIUS_MODEL", "claude-haiku-4-5"),
         max_tokens=256,
-        system=_SYSTEM,
+        system=system,
         tools=_TOOLS,
         tool_choice={"type": "any"},
         messages=[{"role": "user", "content": prompt}],
