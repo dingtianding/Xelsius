@@ -7,7 +7,15 @@ from app.agent.service import resolve_tool
 from app.audit import logger
 from app.ingest import data as ingest_data
 from app.ingest import ocr as ingest_ocr
-from app.models import AuditEntry, RunRequest, RunResponse, UploadResponse
+from app.models import (
+    AuditEntry,
+    ApplyRequest,
+    ApplyResponse,
+    RunRequest,
+    RunResponse,
+    Transaction,
+    UploadResponse,
+)
 from app.tools import categorize as _categorize_reg  # noqa: F401 — registers tool
 from app.tools import anomalies as _anomalies_reg  # noqa: F401
 from app.tools import summary as _summary_reg  # noqa: F401
@@ -67,6 +75,17 @@ def agent_run(
         diff=diff,
         remaining=remaining,
     )
+
+
+@app.get("/transactions", response_model=list[Transaction])
+def get_transactions() -> list[Transaction]:
+    return adapter.get_transactions()
+
+
+@app.post("/agent/apply", response_model=ApplyResponse)
+def agent_apply(req: ApplyRequest) -> ApplyResponse:
+    adapter.apply_diff(req.diff)
+    return ApplyResponse(transactions=adapter.get_transactions())
 
 
 @app.post("/ingest/data", response_model=UploadResponse)

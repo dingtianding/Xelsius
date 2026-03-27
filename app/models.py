@@ -63,6 +63,14 @@ class UploadResponse(BaseModel):
     count: int
 
 
+class ApplyRequest(BaseModel):
+    diff: Diff
+
+
+class ApplyResponse(BaseModel):
+    transactions: list[Transaction]
+
+
 class RunRequest(BaseModel):
     prompt: str
     api_key: str | None = None
