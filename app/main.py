@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.adapters.memory import MemoryAdapter
 from app.agent.service import resolve_tool
@@ -10,6 +11,13 @@ from app.tools import summary as _summary_reg  # noqa: F401
 from app.tools.registry import execute
 
 app = FastAPI(title="Xelsius", version="0.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 adapter = MemoryAdapter()
 
