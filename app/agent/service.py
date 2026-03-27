@@ -66,19 +66,29 @@ _SYSTEM = (
     "and supply the correct arguments. Do not explain — just call the tool."
 )
 
-_client: anthropic.Anthropic | None = None
+_host_client: anthropic.Anthropic | None = None
 
 
-def _get_client() -> anthropic.Anthropic:
-    global _client
-    if _client is None:
-        _client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    return _client
+def _get_host_client() -> anthropic.Anthropic:
+    """Client using the app owner's API key (for free-tier visitors)."""
+    global _host_client
+    if _host_client is None:
+        key = os.environ.get("ANTHROPIC_API_KEY")
+        if not key:
+            raise RuntimeError("ANTHROPIC_API_KEY not set — cannot serve free-tier requests")
+        _host_client = anthropic.Anthropic(api_key=key)
+    return _host_client
 
 
-def resolve_tool(prompt: str) -> ToolCall:
+def _get_client(user_api_key: str | None = None) -> anthropic.Anthropic:
+    if user_api_key:
+        return anthropic.Anthropic(api_key=user_api_key)
+    return _get_host_client()
+
+
+def resolve_tool(prompt: str, user_api_key: str | None = None) -> ToolCall:
     """Use Claude to map a natural-language prompt to a structured tool call."""
-    client = _get_client()
+    client = _get_client(user_api_key)
 
     response = client.messages.create(
         model=os.environ.get("XELSIUS_MODEL", "claude-haiku-4-5"),

@@ -60,12 +60,14 @@ Diff = UpdateCellsDiff | CreateSheetDiff
 
 class RunRequest(BaseModel):
     prompt: str
+    api_key: str | None = None
 
 
 class RunResponse(BaseModel):
     tool: str
     args: dict[str, Any]
     diff: Diff
+    remaining: int | None = None
 
 
 # --- Audit ---
