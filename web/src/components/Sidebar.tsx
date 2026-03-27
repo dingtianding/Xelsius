@@ -91,8 +91,8 @@ export default function Sidebar({
       {/* Header */}
       <div className="px-4 py-3 border-b border-emerald-900/50">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-emerald-100">Xelsius</h2>
-          <span className="text-[10px] text-emerald-600 font-mono">agent</span>
+          <h2 className="text-sm font-semibold text-white">Xelsius</h2>
+          <span className="text-[10px] text-zinc-400 font-mono">agent</span>
         </div>
       </div>
 
@@ -100,7 +100,7 @@ export default function Sidebar({
       <div className="flex-1 overflow-y-auto px-4 py-3">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
-            <p className="text-xs text-emerald-700 mb-4">
+            <p className="text-xs text-zinc-500 mb-4">
               Describe what you want to do with your data
             </p>
             <div className="flex flex-col gap-1.5 w-full">
@@ -114,7 +114,7 @@ export default function Sidebar({
                   onClick={() => {
                     setInput(suggestion);
                   }}
-                  className="text-left text-xs text-emerald-500/70 hover:text-emerald-300 hover:bg-emerald-900/30 rounded-md px-3 py-2 transition-colors border border-emerald-900/30 hover:border-emerald-700/50"
+                  className="text-left text-xs text-zinc-300 hover:text-zinc-200 hover:bg-emerald-900/30 rounded-md px-3 py-2 transition-colors border border-emerald-900/30 hover:border-emerald-700/50"
                 >
                   {suggestion}
                 </button>
@@ -128,13 +128,13 @@ export default function Sidebar({
                 {msg.role === "user" ? (
                   <div className="flex justify-end">
                     <div className="bg-emerald-800/40 border border-emerald-700/30 rounded-lg px-3 py-2 max-w-[85%]">
-                      <p className="text-xs text-emerald-100">{msg.content}</p>
+                      <p className="text-xs text-white">{msg.content}</p>
                     </div>
                   </div>
                 ) : (
                   <div className="flex justify-start">
                     <div className="bg-[#0d2a22] border border-emerald-900/40 rounded-lg px-3 py-2 max-w-[85%]">
-                      <p className="text-xs text-emerald-200/80">{msg.content}</p>
+                      <p className="text-xs text-zinc-200">{msg.content}</p>
 
                       {/* Diff actions */}
                       {msg.diff && i === messages.length - 1 && pendingDiff && (
@@ -147,7 +147,7 @@ export default function Sidebar({
                           </button>
                           <button
                             onClick={onRejectAll}
-                            className="flex-1 px-2 py-1 text-[11px] font-medium text-emerald-300 bg-emerald-900/50 hover:bg-emerald-800/50 border border-emerald-700/40 rounded transition-colors"
+                            className="flex-1 px-2 py-1 text-[11px] font-medium text-zinc-200 bg-emerald-900/50 hover:bg-emerald-800/50 border border-emerald-700/40 rounded transition-colors"
                           >
                             Reject
                           </button>
@@ -159,7 +159,7 @@ export default function Sidebar({
                         <div className="mt-2 max-h-32 overflow-y-auto rounded border border-emerald-900/40">
                           <table className="w-full text-[11px]">
                             <thead>
-                              <tr className="bg-emerald-900/30 text-emerald-500">
+                              <tr className="bg-emerald-900/30 text-zinc-400">
                                 {Object.keys(msg.diff.data[0] ?? {}).map((key) => (
                                   <th key={key} className="px-2 py-1 text-left font-medium">
                                     {key}
@@ -169,7 +169,7 @@ export default function Sidebar({
                             </thead>
                             <tbody className="divide-y divide-emerald-900/30">
                               {msg.diff.data.map((row, ri) => (
-                                <tr key={ri} className="text-emerald-200/70">
+                                <tr key={ri} className="text-zinc-300">
                                   {Object.values(row).map((val, ci) => (
                                     <td key={ci} className="px-2 py-1 font-mono">
                                       {typeof val === "number"
@@ -230,16 +230,16 @@ export default function Sidebar({
               placeholder="Describe an action..."
               disabled={isLoading}
               rows={3}
-              className="w-full px-3 pt-2.5 pb-1 bg-transparent text-xs text-emerald-100 placeholder:text-emerald-700 focus:outline-none resize-none disabled:opacity-50"
+              className="w-full px-3 pt-2.5 pb-1 bg-transparent text-xs text-white placeholder:text-zinc-500 focus:outline-none resize-none disabled:opacity-50"
             />
             <div className="flex items-center justify-between px-3 pb-2">
-              <span className="text-[10px] text-emerald-800">
+              <span className="text-[10px] text-zinc-500">
                 Enter to send
               </span>
               <button
                 type="submit"
                 disabled={isLoading || !input.trim()}
-                className="px-2.5 py-1 text-[11px] font-medium text-emerald-100 bg-emerald-700 hover:bg-emerald-600 disabled:bg-emerald-900/50 disabled:text-emerald-800 rounded transition-colors"
+                className="px-2.5 py-1 text-[11px] font-medium text-white bg-emerald-700 hover:bg-emerald-600 disabled:bg-emerald-900/50 disabled:text-zinc-500 rounded transition-colors"
               >
                 {isLoading ? "..." : "Send"}
               </button>
