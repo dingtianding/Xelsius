@@ -60,7 +60,7 @@ def test_apply_persists():
 # --- POST /agent/run (mocked Claude) ---
 
 
-def _mock_resolve(prompt: str, user_api_key: str | None = None) -> ToolCall:
+def _mock_resolve(prompt: str, user_api_key: str | None = None, context: str = "") -> ToolCall:
     return ToolCall(tool=ToolName.CATEGORIZE_TRANSACTIONS, args={})
 
 
