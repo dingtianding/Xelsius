@@ -7,6 +7,13 @@ dist/
 .env.local
 .env.*.local
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
 # IDE
 .idea/
 .vscode/
