@@ -1,18 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
-import { AgGridReact } from "ag-grid-react";
-import {
-  AllCommunityModule,
-  ModuleRegistry,
-  type ColDef,
-  type CellClassRules,
-  type ICellRendererParams,
-  type CellEditingStoppedEvent,
-} from "ag-grid-community";
-import type { Transaction, CellChange } from "@/lib/types";
+import { useEffect, useRef, useCallback } from "react";
+import { UniverSheetsCorePreset } from "@univerjs/preset-sheets-core";
+import sheetsCoreEnUS from "@univerjs/preset-sheets-core/locales/en-US";
+import { createUniver, LocaleType, mergeLocales } from "@univerjs/presets";
+import type { FUniver } from "@univerjs/presets";
 
-ModuleRegistry.registerModules([AllCommunityModule]);
+import "@univerjs/preset-sheets-core/lib/index.css";
+
+import type { Transaction, CellChange } from "@/lib/types";
 
 interface SpreadsheetGridProps {
   transactions: Transaction[];
@@ -22,57 +18,64 @@ interface SpreadsheetGridProps {
   onCellEdit: (rowIndex: number, column: string, value: string | number) => void;
 }
 
-function DiffCellRenderer(props: ICellRendererParams) {
-  const change: CellChange | undefined = props.data?._changes?.[props.colDef?.field ?? ""];
+const COL_MAP: Record<string, number> = {
+  date: 0,
+  description: 1,
+  amount: 2,
+  category: 3,
+};
 
-  if (!change) {
-    const val = props.value;
-    if (props.colDef?.field === "amount" && typeof val === "number") {
-      return <span>{val.toLocaleString("en-US", { style: "currency", currency: "USD" })}</span>;
-    }
-    if (props.colDef?.field === "category" && !val) {
-      return <span className="text-zinc-600 italic">—</span>;
-    }
-    return <span>{val}</span>;
-  }
+const COL_REVERSE: Record<number, string> = {
+  0: "date",
+  1: "description",
+  2: "amount",
+  3: "category",
+};
 
-  const onAccept = props.data?._onAccept;
-  const onReject = props.data?._onReject;
+function buildWorkbookData(transactions: Transaction[]) {
+  const cellData: Record<number, Record<number, { v: string | number }>> = {};
 
-  return (
-    <div className="flex items-center gap-1.5 w-full group">
-      <div className="flex items-center gap-1.5 flex-1 min-w-0">
-        {change.before !== "" && (
-          <span className="line-through text-red-400/60 text-xs shrink-0">
-            {change.before}
-          </span>
-        )}
-        <span className="text-emerald-300 font-medium truncate">{change.after}</span>
-      </div>
-      <div className="flex gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onAccept?.(change);
-          }}
-          className="w-5 h-5 flex items-center justify-center rounded text-emerald-400 hover:bg-emerald-400/20 text-xs"
-          title="Accept"
-        >
-          &#x2713;
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onReject?.(change);
-          }}
-          className="w-5 h-5 flex items-center justify-center rounded text-red-400 hover:bg-red-400/20 text-xs"
-          title="Reject"
-        >
-          &#x2717;
-        </button>
-      </div>
-    </div>
-  );
+  // Header row
+  cellData[0] = {
+    0: { v: "Date" },
+    1: { v: "Description" },
+    2: { v: "Amount" },
+    3: { v: "Category" },
+  };
+
+  // Data rows
+  transactions.forEach((txn, i) => {
+    cellData[i + 1] = {
+      0: { v: txn.date },
+      1: { v: txn.description },
+      2: { v: txn.amount },
+      3: { v: txn.category || "" },
+    };
+  });
+
+  return {
+    id: "xelsius-workbook",
+    sheetOrder: ["transactions"],
+    name: "Xelsius",
+    appVersion: "1.0.0",
+    sheets: {
+      transactions: {
+        id: "transactions",
+        name: "Transactions",
+        rowCount: transactions.length + 5,
+        columnCount: 6,
+        defaultRowHeight: 28,
+        defaultColumnWidth: 150,
+        columnData: {
+          0: { w: 110 },
+          1: { w: 250 },
+          2: { w: 120 },
+          3: { w: 160 },
+        },
+        cellData,
+      },
+    },
+  };
 }
 
 export default function SpreadsheetGrid({
@@ -82,111 +85,160 @@ export default function SpreadsheetGrid({
   onRejectChange,
   onCellEdit,
 }: SpreadsheetGridProps) {
-  const changeMap = useMemo(() => {
-    const map = new Map<number, Map<string, CellChange>>();
-    for (const c of pendingChanges) {
-      if (!map.has(c.row)) map.set(c.row, new Map());
-      map.get(c.row)!.set(c.column, c);
-    }
-    return map;
-  }, [pendingChanges]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const apiRef = useRef<FUniver | null>(null);
+  const pendingRef = useRef<CellChange[]>(pendingChanges);
+  const onAcceptRef = useRef(onAcceptChange);
+  const onRejectRef = useRef(onRejectChange);
+  const onCellEditRef = useRef(onCellEdit);
+  const transactionsRef = useRef(transactions);
 
-  const rowData = useMemo(() => {
-    return transactions.map((txn, idx) => {
-      const rowChanges = changeMap.get(idx);
-      const changes: Record<string, CellChange> = {};
-      if (rowChanges) {
-        for (const [col, change] of rowChanges) {
-          changes[col] = change;
+  // Keep refs current
+  pendingRef.current = pendingChanges;
+  onAcceptRef.current = onAcceptChange;
+  onRejectRef.current = onRejectChange;
+  onCellEditRef.current = onCellEdit;
+  transactionsRef.current = transactions;
+
+  // Initialize Univer once
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const { univerAPI } = createUniver({
+      locale: LocaleType.EN_US,
+      locales: {
+        [LocaleType.EN_US]: mergeLocales(sheetsCoreEnUS),
+      },
+      presets: [
+        UniverSheetsCorePreset({
+          container: containerRef.current,
+        }),
+      ],
+    });
+
+    apiRef.current = univerAPI;
+
+    const workbookData = buildWorkbookData(transactionsRef.current);
+    univerAPI.createWorkbook(workbookData);
+
+    // Style header row
+    const sheet = univerAPI.getActiveWorkbook()?.getActiveSheet();
+    if (sheet) {
+      sheet.getRange(0, 0, 1, 4)?.setBackgroundColor("#18181b");
+      sheet.getRange(0, 0, 1, 4)?.setFontWeight("bold");
+      sheet.getRange(0, 0, 1, 4)?.setFontColor("#a1a1aa");
+    }
+
+    // Listen for cell edits
+    const sub = univerAPI.onCommandExecuted((command) => {
+      if (command.id === "sheet.mutation.set-range-values") {
+        const sheet = univerAPI.getActiveWorkbook()?.getActiveSheet();
+        if (!sheet) return;
+
+        const params = command.params as {
+          cellValue?: Record<number, Record<number, { v?: string | number }>>;
+        };
+        if (!params?.cellValue) return;
+
+        for (const [rowStr, cols] of Object.entries(params.cellValue)) {
+          const row = Number(rowStr);
+          if (row === 0) continue; // skip header
+          for (const [colStr, cell] of Object.entries(cols)) {
+            const col = Number(colStr);
+            const field = COL_REVERSE[col];
+            if (field && cell?.v !== undefined) {
+              onCellEditRef.current(row - 1, field, cell.v);
+            }
+          }
         }
       }
-      return {
-        _rowIndex: idx,
-        _changes: changes,
-        _onAccept: onAcceptChange,
-        _onReject: onRejectChange,
-        ...txn,
-      };
     });
-  }, [transactions, changeMap, onAcceptChange, onRejectChange]);
 
-  const diffCellClassRules: CellClassRules = {
-    "bg-emerald-500/10 border-l-2 border-l-emerald-500": (params) => {
-      const field = params.colDef?.field ?? "";
-      return !!params.data?._changes?.[field];
-    },
-  };
+    return () => {
+      sub?.dispose();
+      univerAPI.dispose();
+      apiRef.current = null;
+    };
+  }, []);
 
-  const columnDefs: ColDef[] = useMemo(
-    () => [
-      {
-        headerName: "#",
-        valueGetter: (params) => (params.data?._rowIndex ?? 0) + 1,
-        width: 50,
-        pinned: "left" as const,
-        cellClass: "text-zinc-500 font-mono text-xs",
-        sortable: false,
-        filter: false,
-      },
-      {
-        field: "date",
-        headerName: "Date",
-        width: 120,
-        editable: (params) => !params.data?._changes?.["date"],
-        cellRenderer: DiffCellRenderer,
-        cellClassRules: diffCellClassRules,
-      },
-      {
-        field: "description",
-        headerName: "Description",
-        flex: 2,
-        minWidth: 200,
-        editable: (params) => !params.data?._changes?.["description"],
-        cellRenderer: DiffCellRenderer,
-        cellClassRules: diffCellClassRules,
-      },
-      {
-        field: "amount",
-        headerName: "Amount",
-        width: 130,
-        editable: (params) => !params.data?._changes?.["amount"],
-        cellRenderer: DiffCellRenderer,
-        cellClassRules: diffCellClassRules,
-      },
-      {
-        field: "category",
-        headerName: "Category",
-        flex: 1,
-        minWidth: 160,
-        editable: (params) => !params.data?._changes?.["category"],
-        cellRenderer: DiffCellRenderer,
-        cellClassRules: diffCellClassRules,
-      },
-    ],
-    [diffCellClassRules],
-  );
+  // Apply diff highlighting
+  const applyDiffHighlighting = useCallback(() => {
+    const api = apiRef.current;
+    if (!api) return;
+    const sheet = api.getActiveWorkbook()?.getActiveSheet();
+    if (!sheet) return;
 
-  function handleCellEditStopped(event: CellEditingStoppedEvent) {
-    if (!event.valueChanged || !event.colDef.field) return;
-    const rowIndex: number = event.data._rowIndex;
-    const field = event.colDef.field;
-    const value = field === "amount" ? Number(event.newValue) : event.newValue;
-    onCellEdit(rowIndex, field, value);
-  }
+    const rowCount = transactionsRef.current.length;
+
+    // Clear previous highlighting on data rows
+    for (let r = 1; r <= rowCount; r++) {
+      sheet.getRange(r, 0, 1, 4)?.setBackgroundColor("#000000");
+      sheet.getRange(r, 0, 1, 4)?.setFontColor("#e4e4e7");
+    }
+
+    // Apply pending change highlighting
+    for (const change of pendingRef.current) {
+      const row = change.row + 1; // offset for header
+      const col = COL_MAP[change.column];
+      if (col === undefined) continue;
+
+      const range = sheet.getRange(row, col, 1, 1);
+      if (!range) continue;
+
+      // Show proposed value in the cell
+      range.setValue(change.after);
+      range.setBackgroundColor("#064e3b");
+      range.setFontColor("#6ee7b7");
+    }
+  }, []);
+
+  // Sync transactions to sheet when they change (after accept)
+  useEffect(() => {
+    const api = apiRef.current;
+    if (!api) return;
+    const sheet = api.getActiveWorkbook()?.getActiveSheet();
+    if (!sheet) return;
+
+    transactions.forEach((txn, i) => {
+      const row = i + 1;
+      sheet.getRange(row, 0, 1, 1)?.setValue(txn.date);
+      sheet.getRange(row, 1, 1, 1)?.setValue(txn.description);
+      sheet.getRange(row, 2, 1, 1)?.setValue(txn.amount);
+      sheet.getRange(row, 3, 1, 1)?.setValue(txn.category || "");
+    });
+
+    applyDiffHighlighting();
+  }, [transactions, applyDiffHighlighting]);
+
+  // Update highlighting when pending changes change
+  useEffect(() => {
+    applyDiffHighlighting();
+  }, [pendingChanges, applyDiffHighlighting]);
 
   return (
-    <div className="ag-theme-alpine-dark w-full h-full rounded-lg overflow-hidden border border-zinc-700">
-      <AgGridReact
-        rowData={rowData}
-        columnDefs={columnDefs}
-        headerHeight={36}
-        rowHeight={40}
-        domLayout="autoHeight"
-        suppressCellFocus={false}
-        suppressRowHoverHighlight={false}
-        singleClickEdit={false}
-        onCellEditingStopped={handleCellEditStopped}
-      />
+    <div className="flex flex-col h-full">
+      {/* Diff action bar */}
+      {pendingChanges.length > 0 && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-emerald-950/50 border-b border-emerald-500/30 text-xs">
+          <span className="text-emerald-400 font-medium">
+            {pendingChanges.length} proposed change{pendingChanges.length !== 1 ? "s" : ""}
+          </span>
+          <span className="text-zinc-500">|</span>
+          <button
+            onClick={() => pendingChanges.forEach((c) => onAcceptChange(c))}
+            className="text-emerald-400 hover:text-emerald-300 font-medium"
+          >
+            Accept All (&#x2713;)
+          </button>
+          <button
+            onClick={() => pendingChanges.forEach((c) => onRejectChange(c))}
+            className="text-red-400 hover:text-red-300 font-medium"
+          >
+            Reject All (&#x2717;)
+          </button>
+        </div>
+      )}
+      <div ref={containerRef} className="flex-1" />
     </div>
   );
 }

@@ -5,15 +5,10 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* AG Grid dark theme overrides */
-.ag-theme-alpine-dark {
-  --ag-background-color: #0c0c0c;
-  --ag-header-background-color: #18181b;
-  --ag-odd-row-background-color: #0c0c0c;
-  --ag-row-hover-color: #1a1a1e;
-  --ag-border-color: #27272a;
-  --ag-header-foreground-color: #a1a1aa;
-  --ag-foreground-color: #e4e4e7;
-  --ag-font-size: 13px;
-  --ag-row-border-color: #1e1e22;
+/* Univer dark theme overrides */
+.univer-app {
+  --univer-bg-color: #0c0c0c;
+  --univer-bg-color-secondary: #18181b;
+  --univer-text-color: #e4e4e7;
+  --univer-border-color: #27272a;
 }
