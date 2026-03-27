@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import ratelimit
 from app.adapters.memory import MemoryAdapter
+from app.agent.context import build_context
 from app.agent.service import resolve_tool
 from app.audit import logger
 from app.ingest import data as ingest_data
@@ -53,14 +54,15 @@ def agent_run(
                 detail="Free tier limit reached. Provide your own API key to continue.",
             )
 
-    # 1. Agent: resolve prompt → tool call
+    # 1. Build context + resolve prompt → tool call
+    transactions = adapter.get_transactions()
+    context = build_context(transactions, logger.get_log())
     try:
-        tool_call = resolve_tool(req.prompt, user_api_key=user_key)
+        tool_call = resolve_tool(req.prompt, user_api_key=user_key, context=context)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-    # 2. Tool: execute pure function → diff
-    transactions = adapter.get_transactions()
+    # 2. Tool: execute pure function → diff (reuse same transactions snapshot)
     diff = execute(tool_call.tool, transactions, tool_call.args)
 
     # 3. Audit: log everything
