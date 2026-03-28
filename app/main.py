@@ -355,6 +355,32 @@ def get_suggestions(
     )
 
 
+# --- Export ---
+
+
+@app.get("/export/financial-statements")
+def export_financial_statements(
+    x_session_id: str | None = Header(default=None),
+):
+    """Generate a 10-K style PDF with Balance Sheet and Income Statement."""
+    from starlette.responses import Response
+
+    from app.export.pdf import generate_financial_statements
+
+    _, session = _get_session(x_session_id)
+    workpaper = session.adapter.get_workpaper()
+
+    if not workpaper.accounts:
+        raise HTTPException(status_code=400, detail="No accounts loaded — upload data first")
+
+    pdf_bytes = generate_financial_statements(workpaper.accounts)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=financial_statements.pdf"},
+    )
+
+
 # --- Audit log ---
 
 

@@ -55,7 +55,7 @@ SAMPLE_ACCOUNTS: list[Account] = [
 
     # Equity
     Account(number="3000", name="Common Stock", type=AccountType.EQUITY, balance=200_000.00, prior_year_balance=200_000.00),
-    Account(number="3100", name="Retained Earnings", type=AccountType.EQUITY, balance=489_400.00, prior_year_balance=412_600.00),
+    Account(number="3100", name="Retained Earnings", type=AccountType.EQUITY, balance=609_600.00, prior_year_balance=491_900.00),
     Account(number="3200", name="Dividends Declared", type=AccountType.EQUITY, balance=35_000.00, prior_year_balance=30_000.00),
 
     # Revenue
