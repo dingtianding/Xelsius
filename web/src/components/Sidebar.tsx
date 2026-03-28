@@ -63,11 +63,9 @@ export default function Sidebar({
   const [isDragOver, setIsDragOver] = useState(false);
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // FE defaults — instant, free
   const feSuggestions = useMemo(() => getSuggestions(transactions), [transactions]);
-
-  // AI suggestions — async, replaces FE defaults when ready
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
   const [aiLoaded, setAiLoaded] = useState(false);
 
@@ -75,12 +73,10 @@ export default function Sidebar({
     setAiLoaded(false);
     const timer = setTimeout(() => {
       getAISuggestions().then((results) => {
-        if (results.length > 0) {
-          setAiSuggestions(results);
-        }
+        if (results.length > 0) setAiSuggestions(results);
         setAiLoaded(true);
       });
-    }, 500); // debounce
+    }, 500);
     return () => clearTimeout(timer);
   }, [transactions]);
 
@@ -93,6 +89,11 @@ export default function Sidebar({
         ? pendingDiff.data.length
         : 0;
 
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isLoading, isUploading]);
+
   function handleFileDrop(file: File) {
     if (!isValidFile(file)) return;
     setAttachedFile(file);
@@ -101,7 +102,6 @@ export default function Sidebar({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    // If there's an attached file, upload it
     if (attachedFile) {
       setMessages((prev) => [
         ...prev,
@@ -109,12 +109,8 @@ export default function Sidebar({
       ]);
       onFileUpload(attachedFile);
       setAttachedFile(null);
-
       setTimeout(() => {
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: "Loading file..." },
-        ]);
+        setMessages((prev) => [...prev, { role: "assistant", content: "Loading file..." }]);
       }, 100);
       return;
     }
@@ -125,12 +121,8 @@ export default function Sidebar({
     setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
     setInput("");
     onPrompt(trimmed);
-
     setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "Running analysis..." },
-      ]);
+      setMessages((prev) => [...prev, { role: "assistant", content: "Running analysis..." }]);
     }, 100);
   }
 
@@ -157,7 +149,6 @@ export default function Sidebar({
     });
   }
 
-  // Update last assistant message when file upload completes
   if (
     !isUploading &&
     messages.length > 0 &&
@@ -166,10 +157,7 @@ export default function Sidebar({
   ) {
     setMessages((prev) => {
       const next = [...prev];
-      next[next.length - 1] = {
-        role: "assistant",
-        content: "File loaded into the spreadsheet.",
-      };
+      next[next.length - 1] = { role: "assistant", content: "File loaded into the spreadsheet." };
       return next;
     });
   }
@@ -177,139 +165,126 @@ export default function Sidebar({
   return (
     <div className="flex flex-col h-full bg-[#0a1f1a]">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-emerald-900/50">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-white">Xelsius</h2>
-          <span className="text-xs text-zinc-400 font-mono">agent</span>
+      <div className="px-4 py-2.5 border-b border-emerald-900/50 flex items-center justify-between">
+        <span className="text-sm font-medium text-white">New Chat</span>
+        <div className="flex items-center gap-2">
+          <button className="text-zinc-500 hover:text-zinc-300 text-lg leading-none">+</button>
+          <button className="text-zinc-500 hover:text-zinc-300 text-xs leading-none">···</button>
         </div>
       </div>
 
-      {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-3">
-        {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center gap-5">
-            <div className="w-full">
-              <div className="flex flex-col gap-1.5">
-                {suggestions.map((s) => (
-                  <button
-                    key={s.prompt}
-                    onClick={() => {
-                      setInput(s.prompt);
-                    }}
-                    className="text-left text-sm text-zinc-300 hover:text-zinc-200 hover:bg-emerald-900/30 rounded-md px-3 py-2.5 transition-colors border border-emerald-900/30 hover:border-emerald-700/50 cursor-pointer"
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
+      {/* Messages — column-reverse so latest is at top */}
+      <div className="flex-1 overflow-y-auto flex flex-col-reverse">
+        <div ref={messagesEndRef} />
+
+        {/* Suggestions at the bottom (visually top in reverse) when no messages */}
+        {messages.length === 0 && (
+          <div className="px-4 py-4">
+            <div className="flex flex-col gap-1.5">
+              {suggestions.map((s) => (
+                <button
+                  key={s.prompt}
+                  onClick={() => setInput(s.prompt)}
+                  className="text-left text-sm text-zinc-400 hover:text-zinc-200 hover:bg-emerald-900/30 rounded-md px-3 py-2 transition-colors cursor-pointer"
+                >
+                  {s.label}
+                </button>
+              ))}
             </div>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {messages.map((msg, i) => (
-              <div key={i}>
-                {msg.role === "user" ? (
-                  <div className="flex justify-end">
-                    <div className="bg-emerald-800/40 border border-emerald-700/30 rounded-lg px-3 py-2 max-w-[85%]">
-                      {msg.fileName && (
-                        <div className="flex items-center gap-1.5 mb-1 text-xs text-emerald-400">
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                          </svg>
-                          {msg.fileName}
-                        </div>
-                      )}
-                      <p className="text-sm text-white">{msg.content}</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex justify-start">
-                    <div className="bg-[#0d2a22] border border-emerald-900/40 rounded-lg px-3 py-2 max-w-[85%]">
-                      <p className="text-sm text-zinc-200">{msg.content}</p>
-
-                      {msg.diff && i === messages.length - 1 && pendingDiff && (
-                        <div className="flex gap-2 mt-2 pt-2 border-t border-emerald-900/40">
-                          <button
-                            onClick={onAcceptAll}
-                            className="flex-1 px-2 py-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded transition-colors"
-                          >
-                            Accept
-                          </button>
-                          <button
-                            onClick={onRejectAll}
-                            className="flex-1 px-2 py-1 text-xs font-medium text-zinc-200 bg-emerald-900/50 hover:bg-emerald-800/50 border border-emerald-700/40 rounded transition-colors"
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      )}
-
-                      {msg.diff?.type === "create_sheet" && (
-                        <div className="mt-2 max-h-32 overflow-y-auto rounded border border-emerald-900/40">
-                          <table className="w-full text-xs">
-                            <thead>
-                              <tr className="bg-emerald-900/30 text-zinc-400">
-                                {Object.keys(msg.diff.data[0] ?? {}).map((key) => (
-                                  <th key={key} className="px-2 py-1 text-left font-medium">
-                                    {key}
-                                  </th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-emerald-900/30">
-                              {msg.diff.data.map((row, ri) => (
-                                <tr key={ri} className="text-zinc-300">
-                                  {Object.values(row).map((val, ci) => (
-                                    <td key={ci} className="px-2 py-1 font-mono">
-                                      {typeof val === "number"
-                                        ? val.toLocaleString("en-US", {
-                                            style: "currency",
-                                            currency: "USD",
-                                          })
-                                        : val}
-                                    </td>
-                                  ))}
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {(isLoading || isUploading) && (
-              <div className="flex justify-start">
-                <div className="bg-[#0d2a22] border border-emerald-900/40 rounded-lg px-3 py-2">
-                  <div className="flex gap-1">
-                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
+        {/* Messages */}
+        <div className="flex flex-col gap-0.5 px-4 py-3">
+          {messages.map((msg, i) => (
+            <div key={i} className="py-2">
+              {msg.role === "user" ? (
+                <div>
+                  {msg.fileName && (
+                    <div className="flex items-center gap-1.5 mb-1 text-xs text-emerald-400">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                      {msg.fileName}
+                    </div>
+                  )}
+                  <p className="text-sm text-white font-medium">{msg.content}</p>
+                </div>
+              ) : (
+                <div className="border-l-2 border-emerald-700/50 pl-3">
+                  <p className="text-sm text-zinc-300">{msg.content}</p>
+
+                  {msg.diff && i === messages.length - 1 && pendingDiff && (
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={onAcceptAll}
+                        className="px-3 py-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded transition-colors"
+                      >
+                        Accept
+                      </button>
+                      <button
+                        onClick={onRejectAll}
+                        className="px-3 py-1 text-xs font-medium text-zinc-300 hover:text-white transition-colors"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  )}
+
+                  {msg.diff?.type === "create_sheet" && (
+                    <div className="mt-2 max-h-32 overflow-y-auto rounded border border-emerald-900/40">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-emerald-900/30 text-zinc-400">
+                            {Object.keys(msg.diff.data[0] ?? {}).map((key) => (
+                              <th key={key} className="px-2 py-1 text-left font-medium">{key}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-emerald-900/30">
+                          {msg.diff.data.map((row, ri) => (
+                            <tr key={ri} className="text-zinc-300">
+                              {Object.values(row).map((val, ci) => (
+                                <td key={ci} className="px-2 py-1 font-mono">
+                                  {typeof val === "number"
+                                    ? val.toLocaleString("en-US", { style: "currency", currency: "USD" })
+                                    : val}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+
+          {(isLoading || isUploading) && (
+            <div className="py-2 border-l-2 border-emerald-700/50 pl-3">
+              <div className="flex gap-1">
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+              </div>
+            </div>
+          )}
+        </div>
+
         {error && (
-          <div className="mt-3 text-xs text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
+          <div className="mx-4 mb-2 text-xs text-red-400 bg-red-400/10 border border-red-400/20 rounded px-3 py-2">
             {error}
           </div>
         )}
       </div>
 
-      {/* Chat Input — supports file drag & drop */}
+      {/* Input at bottom */}
       <div className="px-3 py-3 border-t border-emerald-900/50">
         <form onSubmit={handleSubmit}>
           <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setIsDragOver(true);
-            }}
+            onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
             onDragLeave={() => setIsDragOver(false)}
             onDrop={(e) => {
               e.preventDefault();
@@ -323,7 +298,6 @@ export default function Sidebar({
                 : "border-emerald-800/40 focus-within:border-emerald-600"
             }`}
           >
-            {/* Attached file preview */}
             {attachedFile && (
               <div className="flex items-center gap-2 px-3 pt-2">
                 <div className="flex items-center gap-1.5 bg-emerald-900/40 border border-emerald-800/40 rounded px-2 py-1 text-xs text-emerald-400">
@@ -331,18 +305,11 @@ export default function Sidebar({
                     <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                   </svg>
                   {attachedFile.name}
-                  <button
-                    type="button"
-                    onClick={() => setAttachedFile(null)}
-                    className="ml-1 text-zinc-500 hover:text-zinc-300"
-                  >
-                    &times;
-                  </button>
+                  <button type="button" onClick={() => setAttachedFile(null)} className="ml-1 text-zinc-500 hover:text-zinc-300">&times;</button>
                 </div>
               </div>
             )}
 
-            {/* Drag overlay */}
             {isDragOver && (
               <div className="px-3 py-3 text-center">
                 <p className="text-sm text-emerald-400">Drop file here</p>
@@ -361,14 +328,13 @@ export default function Sidebar({
                       handleSubmit(e);
                     }
                   }}
-                  placeholder={attachedFile ? "Press Enter to upload, or add a message..." : "Describe an action..."}
+                  placeholder={attachedFile ? "Press Enter to upload..." : "Plan, @ for context, / for commands"}
                   disabled={isLoading || isUploading}
                   rows={3}
                   className="w-full px-3 pt-2.5 pb-1 bg-transparent text-sm text-white placeholder:text-zinc-500 focus:outline-none resize-none disabled:opacity-50"
                 />
                 <div className="flex items-center justify-between px-3 pb-2">
                   <div className="flex items-center gap-2">
-                    {/* Mode toggle */}
                     <div className="flex bg-emerald-900/40 rounded-full p-0.5">
                       {(["agent", "chat"] as Mode[]).map((m) => (
                         <button
@@ -376,32 +342,24 @@ export default function Sidebar({
                           type="button"
                           onClick={() => setMode(m)}
                           className={`px-2.5 py-0.5 text-[11px] font-medium rounded-full transition-colors capitalize ${
-                            mode === m
-                              ? "bg-emerald-700 text-white"
-                              : "text-zinc-500 hover:text-zinc-200"
+                            mode === m ? "bg-emerald-700 text-white" : "text-zinc-500 hover:text-zinc-200"
                           }`}
                         >
                           {m}
                         </button>
                       ))}
                     </div>
-
-                    {/* Model selector */}
                     <select
                       value={model}
                       onChange={(e) => setModel(e.target.value)}
                       className="bg-transparent border-none text-zinc-400 text-xs focus:outline-none cursor-pointer"
                     >
                       {MODELS.map((m) => (
-                        <option key={m.id} value={m.id} className="bg-[#0a1f1a]">
-                          {m.label}
-                        </option>
+                        <option key={m.id} value={m.id} className="bg-[#0a1f1a]">{m.label}</option>
                       ))}
                     </select>
                   </div>
-
                   <div className="flex items-center gap-2">
-                    {/* Attach file */}
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
