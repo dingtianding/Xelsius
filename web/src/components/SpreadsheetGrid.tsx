@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { UniverSheetsCorePreset } from "@univerjs/preset-sheets-core";
 import sheetsCoreEnUS from "@univerjs/preset-sheets-core/locales/en-US";
 import { createUniver, LocaleType, mergeLocales } from "@univerjs/presets";
@@ -183,8 +183,8 @@ export default function SpreadsheetGrid({
         const change = changeMap.get(`${i}:${field}`);
         if (change) {
           range.setValue(change.after);
-          range.setBackgroundColor("#064e3b");
-          range.setFontColor("#6ee7b7");
+          range.setBackgroundColor("#422006");
+          range.setFontColor("#fbbf24");
         } else {
           range.setValue(value);
           range.setBackgroundColor("#000000");
@@ -196,29 +196,78 @@ export default function SpreadsheetGrid({
     isUpdatingRef.current = false;
   }, [transactions, pendingChanges]);
 
+  // Position the floating popup near the first changed cell
+  const [popupPos, setPopupPos] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (pendingChanges.length === 0 || !containerRef.current) {
+      setPopupPos(null);
+      return;
+    }
+
+    // Find the first changed cell's position in the DOM
+    const firstChange = pendingChanges[0];
+    const row = firstChange.row + 1; // header offset
+    const col = COL_MAP[firstChange.column] ?? 0;
+
+    // Small delay to let Univer render
+    const timer = setTimeout(() => {
+      const api = apiRef.current;
+      if (!api || !containerRef.current) return;
+
+      // Find cell element by looking at Univer's canvas container
+      const container = containerRef.current;
+      const rect = container.getBoundingClientRect();
+
+      // Estimate cell position based on row/col
+      // Header height ~28px, each row ~28px, row header ~46px
+      const cellTop = 64 + row * 28;
+      const cellLeft = 46 + col * 150;
+
+      setPopupPos({
+        top: Math.min(cellTop + 32, rect.height - 60),
+        left: Math.min(cellLeft, rect.width - 280),
+      });
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [pendingChanges]);
+
   return (
-    <div className="flex flex-col h-full">
-      {pendingChanges.length > 0 && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-emerald-950/50 border-b border-emerald-500/30 text-sm">
-          <span className="text-emerald-400 font-medium">
-            {pendingChanges.length} proposed change{pendingChanges.length !== 1 ? "s" : ""}
-          </span>
-          <span className="text-zinc-500">|</span>
-          <button
-            onClick={() => pendingChanges.forEach((c) => onAcceptChange(c))}
-            className="text-emerald-400 hover:text-emerald-300 font-medium"
-          >
-            Accept All
-          </button>
-          <button
-            onClick={() => pendingChanges.forEach((c) => onRejectChange(c))}
-            className="text-red-400 hover:text-red-300 font-medium"
-          >
-            Reject All
-          </button>
+    <div className="relative flex flex-col h-full">
+      <div ref={containerRef} className="flex-1" />
+
+      {/* Floating accept/reject popup near changed cells */}
+      {pendingChanges.length > 0 && popupPos && (
+        <div
+          className="absolute z-50 animate-in fade-in"
+          style={{ top: popupPos.top, left: popupPos.left }}
+        >
+          <div className="flex items-center gap-1.5 bg-[#1c1208] border border-amber-500/50 rounded-lg shadow-xl shadow-black/50 px-2.5 py-1.5">
+            <span className="text-xs text-amber-400 font-medium mr-1">
+              {pendingChanges.length} change{pendingChanges.length !== 1 ? "s" : ""}
+            </span>
+            <button
+              onClick={() => pendingChanges.forEach((c) => onAcceptChange(c))}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              Accept
+            </button>
+            <button
+              onClick={() => pendingChanges.forEach((c) => onRejectChange(c))}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-zinc-300 bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 rounded transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Reject
+            </button>
+          </div>
         </div>
       )}
-      <div ref={containerRef} className="flex-1" />
     </div>
   );
 }
