@@ -31,3 +31,7 @@ Thumbs.db
 
 # Coverage
 coverage/
+
+# Data
+.data/
+*.db

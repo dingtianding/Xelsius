@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import os
 import time
 import uuid
 
-from app.adapters.memory import MemoryAdapter
-from app.audit import logger as global_logger
+from app.adapters.memory import SAMPLE_ACCOUNTS, SAMPLE_TRANSACTIONS
+from app.adapters.sqlite import SqliteAdapter
 from app.models import AuditEntry, Diff
+
+DATA_DIR = os.environ.get("XELSIUS_DATA_DIR", ".data")
 
 _SESSION_TTL = 60 * 60  # 1 hour
 
@@ -15,8 +18,11 @@ _sessions: dict[str, _Session] = {}
 
 
 class _Session:
-    def __init__(self) -> None:
-        self.adapter = MemoryAdapter()
+    def __init__(self, session_id: str) -> None:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        db_path = os.path.join(DATA_DIR, f"{session_id}.db")
+        self.adapter = SqliteAdapter(db_path=db_path)
+        self.adapter.seed_if_empty(SAMPLE_TRANSACTIONS, SAMPLE_ACCOUNTS)
         self.audit_log: list[AuditEntry] = []
         self.last_active = time.monotonic()
 
@@ -33,7 +39,7 @@ def create_session() -> str:
     """Create a new session and return its ID."""
     _cleanup()
     session_id = uuid.uuid4().hex
-    _sessions[session_id] = _Session()
+    _sessions[session_id] = _Session(session_id)
     return session_id
 
 
