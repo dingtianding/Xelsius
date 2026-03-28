@@ -206,6 +206,15 @@ class DirectToolRequest(BaseModel):
     args: dict[str, Any] = Field(default_factory=dict)
 
 
+class SuggestionItem(BaseModel):
+    label: str
+    prompt: str
+
+
+class SuggestionsResponse(BaseModel):
+    suggestions: list[SuggestionItem]
+
+
 class RunRequest(BaseModel):
     prompt: str
     api_key: str | None = None

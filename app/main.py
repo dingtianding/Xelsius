@@ -8,6 +8,7 @@ from app.agent.service import resolve_tool
 from app.audit import logger
 from app.ingest import data as ingest_data
 from app.ingest import ocr as ingest_ocr
+from app.agent.suggestions import generate_suggestions
 from app.models import (
     AuditEntry,
     ApplyRequest,
@@ -15,6 +16,7 @@ from app.models import (
     DirectToolRequest,
     RunRequest,
     RunResponse,
+    SuggestionsResponse,
     Transaction,
     UploadResponse,
     Workpaper,
@@ -167,6 +169,18 @@ def ingest_ocr_file(
 
     adapter.load_transactions(transactions)
     return UploadResponse(transactions=transactions, count=len(transactions))
+
+
+@app.get("/agent/suggestions", response_model=SuggestionsResponse)
+def get_suggestions(
+    x_api_key: str | None = Header(default=None),
+) -> SuggestionsResponse:
+    """AI-generated suggestions based on current data."""
+    transactions = adapter.get_transactions()
+    suggestions = generate_suggestions(transactions, user_api_key=x_api_key)
+    return SuggestionsResponse(
+        suggestions=[{"label": s["label"], "prompt": s["prompt"]} for s in suggestions]
+    )
 
 
 @app.get("/audit/log", response_model=list[AuditEntry])

@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { AuditEntry, CellChange, Diff, Transaction } from "@/lib/types";
 import { getSuggestions } from "@/lib/suggestions";
+import { getAISuggestions, type AISuggestion } from "@/lib/api";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -63,7 +64,27 @@ export default function Sidebar({
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const suggestions = useMemo(() => getSuggestions(transactions), [transactions]);
+  // FE defaults — instant, free
+  const feSuggestions = useMemo(() => getSuggestions(transactions), [transactions]);
+
+  // AI suggestions — async, replaces FE defaults when ready
+  const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
+  const [aiLoaded, setAiLoaded] = useState(false);
+
+  useEffect(() => {
+    setAiLoaded(false);
+    const timer = setTimeout(() => {
+      getAISuggestions().then((results) => {
+        if (results.length > 0) {
+          setAiSuggestions(results);
+        }
+        setAiLoaded(true);
+      });
+    }, 500); // debounce
+    return () => clearTimeout(timer);
+  }, [transactions]);
+
+  const suggestions = aiLoaded && aiSuggestions.length > 0 ? aiSuggestions : feSuggestions;
 
   const changeCount =
     pendingDiff?.type === "update_cells"

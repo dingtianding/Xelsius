@@ -30,6 +30,22 @@ export async function uploadFile(file: File): Promise<UploadResponse> {
   return res.json();
 }
 
+export interface AISuggestion {
+  label: string;
+  prompt: string;
+}
+
+export async function getAISuggestions(): Promise<AISuggestion[]> {
+  try {
+    const res = await fetch(`${API_BASE}/agent/suggestions`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.suggestions ?? [];
+  } catch {
+    return [];
+  }
+}
+
 export async function getAuditLog(): Promise<AuditEntry[]> {
   const res = await fetch(`${API_BASE}/audit/log`);
   if (!res.ok) throw new Error("Failed to fetch audit log");
