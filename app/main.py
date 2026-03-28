@@ -64,7 +64,7 @@ def agent_run(
 
     # 1. Build context + resolve prompt → tool call
     workpaper = adapter.get_workpaper()
-    context = build_context(workpaper.transactions, logger.get_log())
+    context = build_context(workpaper, logger.get_log())
     try:
         tool_call = resolve_tool(req.prompt, user_api_key=user_key, context=context)
     except ValueError as exc:
