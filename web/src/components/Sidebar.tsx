@@ -166,7 +166,7 @@ export default function Sidebar({
     <div className="flex flex-col h-full bg-[#0a1f1a]">
       {/* Header */}
       <div className="px-4 py-2.5 border-b border-emerald-900/50 flex items-center justify-between">
-        <span className="text-sm font-medium text-white">New Chat</span>
+        <span className="text-sm font-medium text-white">Xelsius Chat</span>
         <div className="flex items-center gap-2">
           <button className="text-zinc-500 hover:text-zinc-300 text-lg leading-none">+</button>
           <button className="text-zinc-500 hover:text-zinc-300 text-xs leading-none">···</button>
