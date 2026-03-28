@@ -13,11 +13,15 @@ from app.models import (
     AuditEntry,
     ApplyRequest,
     ApplyResponse,
+    CellChange,
+    CellEditRequest,
+    CellEditResponse,
     DirectToolRequest,
     RunRequest,
     RunResponse,
     SuggestionsResponse,
     Transaction,
+    UpdateCellsDiff,
     UploadResponse,
     Workpaper,
 )
@@ -113,6 +117,38 @@ def get_transactions() -> list[Transaction]:
 @app.get("/workpaper", response_model=Workpaper)
 def get_workpaper() -> Workpaper:
     return adapter.get_workpaper()
+
+
+@app.post("/cells/edit", response_model=CellEditResponse)
+def cell_edit(req: CellEditRequest) -> CellEditResponse:
+    """Propose a cell edit as a diff — does NOT apply it."""
+    transactions = adapter.get_transactions()
+
+    if req.row < 0 or req.row >= len(transactions):
+        raise HTTPException(status_code=400, detail=f"Row {req.row} out of range")
+
+    txn = transactions[req.row]
+    valid_columns = {"date", "description", "amount", "category"}
+    if req.column not in valid_columns:
+        raise HTTPException(status_code=400, detail=f"Invalid column: {req.column}")
+
+    current_value = getattr(txn, req.column)
+    if req.column == "amount":
+        try:
+            new_value: str | float = float(req.value)
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="Amount must be a number")
+    else:
+        new_value = str(req.value)
+
+    change = CellChange(
+        row=req.row,
+        column=req.column,
+        before=current_value,
+        after=new_value,
+    )
+
+    return CellEditResponse(diff=UpdateCellsDiff(changes=[change]))
 
 
 @app.post("/agent/apply", response_model=ApplyResponse)

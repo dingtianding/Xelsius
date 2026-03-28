@@ -215,6 +215,16 @@ class SuggestionsResponse(BaseModel):
     suggestions: list[SuggestionItem]
 
 
+class CellEditRequest(BaseModel):
+    row: int
+    column: str
+    value: str | float
+
+
+class CellEditResponse(BaseModel):
+    diff: UpdateCellsDiff
+
+
 class RunRequest(BaseModel):
     prompt: str
     api_key: str | None = None

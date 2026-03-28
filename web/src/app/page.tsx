@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import SpreadsheetGrid from "@/components/SpreadsheetGrid";
 import Sidebar from "@/components/Sidebar";
-import { runAgent, uploadFile } from "@/lib/api";
+import { runAgent, uploadFile, proposeCellEdit, applyDiff } from "@/lib/api";
 import { SAMPLE_TRANSACTIONS } from "@/lib/sample-data";
 import type { Transaction, Diff, CellChange, AuditEntry } from "@/lib/types";
 
@@ -47,12 +47,20 @@ export default function Home() {
     }
   }
 
-  const handleAcceptChange = useCallback((change: CellChange) => {
-    setTransactions((prev) => {
-      const next = prev.map((t) => ({ ...t }));
-      (next[change.row] as Record<string, string | number>)[change.column] = change.after;
-      return next;
-    });
+  // Accept a single change — apply it on the backend
+  const handleAcceptChange = useCallback(async (change: CellChange) => {
+    const singleDiff: Diff = { type: "update_cells", changes: [change] };
+    try {
+      const res = await applyDiff(singleDiff);
+      setTransactions(res.transactions);
+    } catch {
+      // Fallback: apply locally
+      setTransactions((prev) => {
+        const next = prev.map((t) => ({ ...t }));
+        (next[change.row] as Record<string, string | number>)[change.column] = change.after;
+        return next;
+      });
+    }
     setPendingChanges((prev) => {
       const next = prev.filter(
         (c) => !(c.row === change.row && c.column === change.column)
@@ -78,17 +86,27 @@ export default function Home() {
     });
   }, []);
 
-  function handleAcceptAll() {
-    if (pendingDiff?.type === "update_cells") {
-      setTransactions((prev) => {
-        const next = prev.map((t) => ({ ...t }));
-        for (const change of pendingChanges) {
-          (next[change.row] as Record<string, string | number>)[change.column] =
-            change.after;
-        }
-        return next;
-      });
+  async function handleAcceptAll() {
+    if (!pendingDiff) return;
+
+    if (pendingDiff.type === "update_cells" && pendingChanges.length > 0) {
+      const diff: Diff = { type: "update_cells", changes: pendingChanges };
+      try {
+        const res = await applyDiff(diff);
+        setTransactions(res.transactions);
+      } catch {
+        // Fallback: apply locally
+        setTransactions((prev) => {
+          const next = prev.map((t) => ({ ...t }));
+          for (const change of pendingChanges) {
+            (next[change.row] as Record<string, string | number>)[change.column] =
+              change.after;
+          }
+          return next;
+        });
+      }
     }
+
     setPendingDiff(null);
     setPendingTool("");
     setPendingChanges([]);
@@ -100,15 +118,40 @@ export default function Home() {
     setPendingChanges([]);
   }
 
+  // Cell edit → send to backend → get diff → add to pending changes
   const handleCellEdit = useCallback(
-    (rowIndex: number, column: string, value: string | number) => {
-      setTransactions((prev) => {
-        const next = prev.map((t) => ({ ...t }));
-        (next[rowIndex] as Record<string, string | number>)[column] = value;
-        return next;
-      });
+    async (rowIndex: number, column: string, value: string | number) => {
+      try {
+        const res = await proposeCellEdit(rowIndex, column, value);
+        const newChanges = res.diff.changes;
+
+        setPendingChanges((prev) => {
+          // Replace any existing change for the same cell, add new ones
+          const filtered = prev.filter(
+            (c) => !newChanges.some((nc) => nc.row === c.row && nc.column === c.column)
+          );
+          return [...filtered, ...newChanges];
+        });
+        setPendingDiff((prev) => {
+          if (prev?.type === "update_cells") {
+            return {
+              type: "update_cells",
+              changes: [
+                ...prev.changes.filter(
+                  (c) => !newChanges.some((nc) => nc.row === c.row && nc.column === c.column)
+                ),
+                ...newChanges,
+              ],
+            };
+          }
+          return { type: "update_cells", changes: newChanges };
+        });
+        if (!pendingTool) setPendingTool("manual_edit");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Edit failed");
+      }
     },
-    [],
+    [pendingTool],
   );
 
   async function handleFileUpload(file: File) {
