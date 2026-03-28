@@ -1,6 +1,6 @@
 import os
 
-from app.agent.providers import get_provider, resolve_via_anthropic, resolve_via_gemini
+from app.agent.providers import get_provider, resolve_via_anthropic, resolve_via_gemini, resolve_via_groq
 from app.models import ToolCall, ToolName
 
 _TOOLS = [
@@ -224,5 +224,7 @@ def resolve_tool(prompt: str, user_api_key: str | None = None, context: str = ""
     provider = get_provider()
     if provider == "gemini":
         return resolve_via_gemini(prompt, system, _TOOLS)
+    elif provider == "groq":
+        return resolve_via_groq(prompt, system, _TOOLS)
     else:
         return resolve_via_anthropic(prompt, system, _TOOLS)

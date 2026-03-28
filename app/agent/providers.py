@@ -1,4 +1,4 @@
-"""LLM provider abstraction — swap between Gemini (free) and Claude."""
+"""LLM provider abstraction — swap between Gemini (free), Groq (free), and Claude."""
 
 from __future__ import annotations
 
@@ -89,3 +89,51 @@ def resolve_via_gemini(
         return ToolCall(tool=ToolName(fc.name), args=dict(fc.args) if fc.args else {})
 
     raise ValueError(f"Gemini did not return a tool call for prompt: {prompt!r}")
+
+
+def resolve_via_groq(
+    prompt: str,
+    system: str,
+    tools: list[dict[str, Any]],
+    api_key: str | None = None,
+) -> ToolCall:
+    from groq import Groq
+
+    key = api_key or os.environ.get("GROQ_API_KEY", "")
+    if not key:
+        raise RuntimeError("GROQ_API_KEY not set")
+
+    client = Groq(api_key=key)
+
+    # Convert Anthropic tool format → OpenAI-compatible format
+    groq_tools = []
+    for tool in tools:
+        groq_tools.append({
+            "type": "function",
+            "function": {
+                "name": tool["name"],
+                "description": tool.get("description", ""),
+                "parameters": tool.get("input_schema", {}),
+            },
+        })
+
+    model = os.environ.get("XELSIUS_GROQ_MODEL", "llama-3.3-70b-versatile")
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt},
+        ],
+        tools=groq_tools,
+        tool_choice="required",
+    )
+
+    message = response.choices[0].message
+    if message.tool_calls:
+        tc = message.tool_calls[0]
+        import json
+        args = json.loads(tc.function.arguments) if tc.function.arguments else {}
+        return ToolCall(tool=ToolName(tc.function.name), args=args)
+
+    raise ValueError(f"Groq did not return a tool call for prompt: {prompt!r}")
