@@ -183,8 +183,8 @@ export default function SpreadsheetGrid({
         const change = changeMap.get(`${i}:${field}`);
         if (change) {
           range.setValue(change.after);
-          range.setBackgroundColor("#422006");
-          range.setFontColor("#fbbf24");
+          range.setBackgroundColor("#854d0e");
+          range.setFontColor("#fef08a");
         } else {
           range.setValue(value);
           range.setBackgroundColor("#000000");
