@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef } from "react";
 import { UniverSheetsCorePreset } from "@univerjs/preset-sheets-core";
 import sheetsCoreEnUS from "@univerjs/preset-sheets-core/locales/en-US";
 import { createUniver, LocaleType, mergeLocales } from "@univerjs/presets";
@@ -32,10 +32,9 @@ const COL_REVERSE: Record<number, string> = {
   3: "category",
 };
 
-function buildWorkbookData(transactions: Transaction[]) {
-  const cellData: Record<number, Record<number, { v: string | number }>> = {};
+function buildCellData(transactions: Transaction[]) {
+  const cellData: Record<number, Record<number, { v: string | number; s?: string }>> = {};
 
-  // Header row
   cellData[0] = {
     0: { v: "Date" },
     1: { v: "Description" },
@@ -43,7 +42,6 @@ function buildWorkbookData(transactions: Transaction[]) {
     3: { v: "Category" },
   };
 
-  // Data rows
   transactions.forEach((txn, i) => {
     cellData[i + 1] = {
       0: { v: txn.date },
@@ -53,29 +51,7 @@ function buildWorkbookData(transactions: Transaction[]) {
     };
   });
 
-  return {
-    id: "xelsius-workbook",
-    sheetOrder: ["transactions"],
-    name: "Xelsius",
-    appVersion: "1.0.0",
-    sheets: {
-      transactions: {
-        id: "transactions",
-        name: "Transactions",
-        rowCount: transactions.length + 5,
-        columnCount: 6,
-        defaultRowHeight: 28,
-        defaultColumnWidth: 150,
-        columnData: {
-          0: { w: 110 },
-          1: { w: 250 },
-          2: { w: 120 },
-          3: { w: 160 },
-        },
-        cellData,
-      },
-    },
-  };
+  return cellData;
 }
 
 export default function SpreadsheetGrid({
@@ -87,18 +63,9 @@ export default function SpreadsheetGrid({
 }: SpreadsheetGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<FUniver | null>(null);
-  const pendingRef = useRef<CellChange[]>(pendingChanges);
-  const onAcceptRef = useRef(onAcceptChange);
-  const onRejectRef = useRef(onRejectChange);
+  const isUpdatingRef = useRef(false);
   const onCellEditRef = useRef(onCellEdit);
-  const transactionsRef = useRef(transactions);
-
-  // Keep refs current
-  pendingRef.current = pendingChanges;
-  onAcceptRef.current = onAcceptChange;
-  onRejectRef.current = onRejectChange;
   onCellEditRef.current = onCellEdit;
-  transactionsRef.current = transactions;
 
   // Initialize Univer once
   useEffect(() => {
@@ -118,37 +85,57 @@ export default function SpreadsheetGrid({
 
     apiRef.current = univerAPI;
 
-    const workbookData = buildWorkbookData(transactionsRef.current);
-    univerAPI.createWorkbook(workbookData);
+    univerAPI.createWorkbook({
+      id: "xelsius-workbook",
+      sheetOrder: ["transactions"],
+      name: "Xelsius",
+      appVersion: "1.0.0",
+      sheets: {
+        transactions: {
+          id: "transactions",
+          name: "Transactions",
+          rowCount: 50,
+          columnCount: 6,
+          defaultRowHeight: 28,
+          defaultColumnWidth: 150,
+          columnData: {
+            0: { w: 110 },
+            1: { w: 250 },
+            2: { w: 120 },
+            3: { w: 160 },
+          },
+          cellData: buildCellData(transactions),
+        },
+      },
+    });
 
-    // Style header row
+    // Style header
     const sheet = univerAPI.getActiveWorkbook()?.getActiveSheet();
     if (sheet) {
-      sheet.getRange(0, 0, 1, 4)?.setBackgroundColor("#18181b");
-      sheet.getRange(0, 0, 1, 4)?.setFontWeight("bold");
-      sheet.getRange(0, 0, 1, 4)?.setFontColor("#a1a1aa");
+      const headerRange = sheet.getRange(0, 0, 1, 4);
+      headerRange?.setBackgroundColor("#18181b");
+      headerRange?.setFontWeight("bold");
+      headerRange?.setFontColor("#a1a1aa");
     }
 
-    // Listen for cell edits
+    // Listen for user edits (not our programmatic updates)
     const sub = univerAPI.onCommandExecuted((command) => {
-      if (command.id === "sheet.mutation.set-range-values") {
-        const sheet = univerAPI.getActiveWorkbook()?.getActiveSheet();
-        if (!sheet) return;
+      if (isUpdatingRef.current) return;
+      if (command.id !== "sheet.mutation.set-range-values") return;
 
-        const params = command.params as {
-          cellValue?: Record<number, Record<number, { v?: string | number }>>;
-        };
-        if (!params?.cellValue) return;
+      const params = command.params as {
+        cellValue?: Record<number, Record<number, { v?: string | number }>>;
+      };
+      if (!params?.cellValue) return;
 
-        for (const [rowStr, cols] of Object.entries(params.cellValue)) {
-          const row = Number(rowStr);
-          if (row === 0) continue; // skip header
-          for (const [colStr, cell] of Object.entries(cols)) {
-            const col = Number(colStr);
-            const field = COL_REVERSE[col];
-            if (field && cell?.v !== undefined) {
-              onCellEditRef.current(row - 1, field, cell.v);
-            }
+      for (const [rowStr, cols] of Object.entries(params.cellValue)) {
+        const row = Number(rowStr);
+        if (row === 0) continue;
+        for (const [colStr, cell] of Object.entries(cols)) {
+          const col = Number(colStr);
+          const field = COL_REVERSE[col];
+          if (field && cell?.v !== undefined) {
+            onCellEditRef.current(row - 1, field, cell.v);
           }
         }
       }
@@ -159,67 +146,60 @@ export default function SpreadsheetGrid({
       univerAPI.dispose();
       apiRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Apply diff highlighting
-  const applyDiffHighlighting = useCallback(() => {
-    const api = apiRef.current;
-    if (!api) return;
-    const sheet = api.getActiveWorkbook()?.getActiveSheet();
-    if (!sheet) return;
-
-    const rowCount = transactionsRef.current.length;
-
-    // Clear previous highlighting on data rows
-    for (let r = 1; r <= rowCount; r++) {
-      sheet.getRange(r, 0, 1, 4)?.setBackgroundColor("#000000");
-      sheet.getRange(r, 0, 1, 4)?.setFontColor("#e4e4e7");
-    }
-
-    // Apply pending change highlighting
-    for (const change of pendingRef.current) {
-      const row = change.row + 1; // offset for header
-      const col = COL_MAP[change.column];
-      if (col === undefined) continue;
-
-      const range = sheet.getRange(row, col, 1, 1);
-      if (!range) continue;
-
-      // Show proposed value in the cell
-      range.setValue(change.after);
-      range.setBackgroundColor("#064e3b");
-      range.setFontColor("#6ee7b7");
-    }
-  }, []);
-
-  // Sync transactions to sheet when they change (after accept)
+  // Sync data + diff highlighting in a single batch
   useEffect(() => {
     const api = apiRef.current;
     if (!api) return;
     const sheet = api.getActiveWorkbook()?.getActiveSheet();
     if (!sheet) return;
 
-    transactions.forEach((txn, i) => {
+    isUpdatingRef.current = true;
+
+    // Build a set of pending changes for quick lookup
+    const changeMap = new Map<string, CellChange>();
+    for (const c of pendingChanges) {
+      changeMap.set(`${c.row}:${c.column}`, c);
+    }
+
+    // Update all data rows in one pass
+    for (let i = 0; i < transactions.length; i++) {
+      const txn = transactions[i];
       const row = i + 1;
-      sheet.getRange(row, 0, 1, 1)?.setValue(txn.date);
-      sheet.getRange(row, 1, 1, 1)?.setValue(txn.description);
-      sheet.getRange(row, 2, 1, 1)?.setValue(txn.amount);
-      sheet.getRange(row, 3, 1, 1)?.setValue(txn.category || "");
-    });
+      const values: [string, string | number][] = [
+        ["date", txn.date],
+        ["description", txn.description],
+        ["amount", txn.amount],
+        ["category", txn.category || ""],
+      ];
 
-    applyDiffHighlighting();
-  }, [transactions, applyDiffHighlighting]);
+      for (const [field, value] of values) {
+        const col = COL_MAP[field];
+        const range = sheet.getRange(row, col, 1, 1);
+        if (!range) continue;
 
-  // Update highlighting when pending changes change
-  useEffect(() => {
-    applyDiffHighlighting();
-  }, [pendingChanges, applyDiffHighlighting]);
+        const change = changeMap.get(`${i}:${field}`);
+        if (change) {
+          range.setValue(change.after);
+          range.setBackgroundColor("#064e3b");
+          range.setFontColor("#6ee7b7");
+        } else {
+          range.setValue(value);
+          range.setBackgroundColor("#000000");
+          range.setFontColor("#e4e4e7");
+        }
+      }
+    }
+
+    isUpdatingRef.current = false;
+  }, [transactions, pendingChanges]);
 
   return (
     <div className="flex flex-col h-full">
-      {/* Diff action bar */}
       {pendingChanges.length > 0 && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-emerald-950/50 border-b border-emerald-500/30 text-xs">
+        <div className="flex items-center gap-2 px-3 py-2 bg-emerald-950/50 border-b border-emerald-500/30 text-sm">
           <span className="text-emerald-400 font-medium">
             {pendingChanges.length} proposed change{pendingChanges.length !== 1 ? "s" : ""}
           </span>
@@ -228,13 +208,13 @@ export default function SpreadsheetGrid({
             onClick={() => pendingChanges.forEach((c) => onAcceptChange(c))}
             className="text-emerald-400 hover:text-emerald-300 font-medium"
           >
-            Accept All (&#x2713;)
+            Accept All
           </button>
           <button
             onClick={() => pendingChanges.forEach((c) => onRejectChange(c))}
             className="text-red-400 hover:text-red-300 font-medium"
           >
-            Reject All (&#x2717;)
+            Reject All
           </button>
         </div>
       )}
