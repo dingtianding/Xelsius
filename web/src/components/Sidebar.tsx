@@ -193,9 +193,6 @@ export default function Sidebar({
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center gap-5">
             <div className="w-full">
-              <p className="text-sm text-zinc-500 mb-3">
-                Drop a file into the chat or describe an action
-              </p>
               <div className="flex flex-col gap-1.5">
                 {[
                   "Categorize all transactions",
