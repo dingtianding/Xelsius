@@ -108,14 +108,15 @@ def resolve_via_groq(
     # Convert Anthropic tool format → OpenAI-compatible format
     groq_tools = []
     for tool in tools:
-        groq_tools.append({
-            "type": "function",
-            "function": {
-                "name": tool["name"],
-                "description": tool.get("description", ""),
-                "parameters": tool.get("input_schema", {}),
-            },
-        })
+        schema = tool.get("input_schema", {})
+        # Groq/Llama rejects empty properties — omit parameters entirely if none
+        fn_def: dict[str, Any] = {
+            "name": tool["name"],
+            "description": tool.get("description", ""),
+        }
+        if schema.get("properties"):
+            fn_def["parameters"] = schema
+        groq_tools.append({"type": "function", "function": fn_def})
 
     model = os.environ.get("XELSIUS_GROQ_MODEL", "llama-3.3-70b-versatile")
 
@@ -133,7 +134,15 @@ def resolve_via_groq(
     if message.tool_calls:
         tc = message.tool_calls[0]
         import json
-        args = json.loads(tc.function.arguments) if tc.function.arguments else {}
+        raw = tc.function.arguments
+        if raw and isinstance(raw, str):
+            args = json.loads(raw)
+        elif raw and isinstance(raw, dict):
+            args = raw
+        else:
+            args = {}
+        if args is None:
+            args = {}
         return ToolCall(tool=ToolName(tc.function.name), args=args)
 
     raise ValueError(f"Groq did not return a tool call for prompt: {prompt!r}")
