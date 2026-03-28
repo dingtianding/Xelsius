@@ -57,13 +57,65 @@ export default function Sidebar({
   transactions,
 }: SidebarProps) {
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [mode, setMode] = useState<Mode>("agent");
   const [model, setModel] = useState("auto");
   const [isDragOver, setIsDragOver] = useState(false);
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Tab system
+  interface ChatTab {
+    id: string;
+    name: string;
+    messages: ChatMessage[];
+  }
+
+  const [tabs, setTabs] = useState<ChatTab[]>([
+    { id: "1", name: "New Chat", messages: [] },
+  ]);
+  const [activeTabId, setActiveTabId] = useState("1");
+  const nextTabId = useRef(2);
+
+  const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
+  const messages = activeTab.messages;
+
+  function setMessages(updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) {
+    setTabs((prev) =>
+      prev.map((t) => {
+        if (t.id !== activeTabId) return t;
+        const newMessages = typeof updater === "function" ? updater(t.messages) : updater;
+        // Auto-name tab from first user message
+        const name = t.name === "New Chat" && newMessages.length > 0
+          ? (newMessages.find((m) => m.role === "user")?.content.slice(0, 20) ?? "New Chat")
+          : t.name;
+        return { ...t, messages: newMessages, name };
+      })
+    );
+  }
+
+  function addTab() {
+    const id = String(nextTabId.current++);
+    setTabs((prev) => [...prev, { id, name: "New Chat", messages: [] }]);
+    setActiveTabId(id);
+  }
+
+  function closeTab(id: string) {
+    setTabs((prev) => {
+      const next = prev.filter((t) => t.id !== id);
+      if (next.length === 0) {
+        const newId = String(nextTabId.current++);
+        return [{ id: newId, name: "New Chat", messages: [] }];
+      }
+      return next;
+    });
+    if (activeTabId === id) {
+      setTabs((prev) => {
+        setActiveTabId(prev[0]?.id ?? "1");
+        return prev;
+      });
+    }
+  }
 
   const feSuggestions = useMemo(() => getSuggestions(transactions), [transactions]);
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
@@ -164,16 +216,41 @@ export default function Sidebar({
 
   return (
     <div className="flex flex-col h-full bg-[#0a1f1a]">
-      {/* Header */}
-      <div className="px-4 py-2.5 border-b border-emerald-900/50 flex items-center justify-between">
-        <span className="text-sm font-medium text-white">Xelsius Chat</span>
-        <div className="flex items-center gap-2">
+      {/* Tab bar */}
+      <div className="flex items-center border-b border-emerald-900/50 overflow-x-auto">
+        <div className="flex items-center flex-1 min-w-0">
+          {tabs.map((tab) => (
+            <div
+              key={tab.id}
+              onClick={() => setActiveTabId(tab.id)}
+              className={`flex items-center gap-1 px-3 py-2 text-xs cursor-pointer shrink-0 border-r border-emerald-900/30 ${
+                tab.id === activeTabId
+                  ? "text-white bg-emerald-900/20"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              <span className="truncate max-w-[100px]">{tab.name}</span>
+              {tabs.length > 1 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    closeTab(tab.id);
+                  }}
+                  className="text-zinc-600 hover:text-zinc-300 ml-0.5"
+                >
+                  &times;
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-1.5 px-2 shrink-0">
           <button
-            onClick={() => setMessages([])}
-            className="text-zinc-500 hover:text-zinc-300 text-lg leading-none"
+            onClick={addTab}
+            className="text-zinc-500 hover:text-zinc-300 text-sm"
             title="New chat"
           >+</button>
-          <button className="text-zinc-500 hover:text-zinc-300 text-xs leading-none">···</button>
+          <button className="text-zinc-500 hover:text-zinc-300 text-xs">···</button>
         </div>
       </div>
 
