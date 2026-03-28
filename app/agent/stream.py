@@ -5,13 +5,11 @@ from __future__ import annotations
 import os
 from typing import Any, Callable
 
-import anthropic
-
 from app.agent.context import build_context
+from app.agent.providers import get_provider
 from app.models import AuditEntry, Diff, ToolCall, ToolName, Workpaper
 
-# Reuse tool definitions and system prompt from service module
-from app.agent.service import _TOOLS, _SYSTEM_BASE, _get_client
+from app.agent.service import _TOOLS, _SYSTEM_BASE, resolve_tool
 from app.tools.registry import execute
 
 StepCallback = Callable[[str, dict[str, Any]], None]
@@ -40,31 +38,11 @@ def run_agent_streaming(
     context = build_context(workpaper, audit_log)
     on_step("context_built", {"token_estimate": len(context.split())})
 
-    # Step 2: Call Claude
-    model = os.environ.get("XELSIUS_MODEL", "claude-haiku-4-5")
-    on_step("calling_claude", {"message": f"Asking Claude ({model}) to pick the best tool...", "model": model})
+    # Step 2: Call LLM
+    provider = get_provider() if not user_api_key else "anthropic"
+    on_step("calling_llm", {"message": f"Asking {provider} to pick the best tool...", "provider": provider})
 
-    client = _get_client(user_api_key)
-    system = f"{_SYSTEM_BASE}\n\n{context}" if context else _SYSTEM_BASE
-
-    response = client.messages.create(
-        model=model,
-        max_tokens=256,
-        system=system,
-        tools=_TOOLS,
-        tool_choice={"type": "any"},
-        messages=[{"role": "user", "content": prompt}],
-    )
-
-    # Step 3: Parse tool selection
-    tool_call: ToolCall | None = None
-    for block in response.content:
-        if block.type == "tool_use":
-            tool_call = ToolCall(tool=ToolName(block.name), args=block.input)
-            break
-
-    if tool_call is None:
-        raise ValueError(f"Claude did not return a tool call for prompt: {prompt!r}")
+    tool_call = resolve_tool(prompt, user_api_key=user_api_key, context=context)
 
     on_step("tool_selected", {
         "message": f"Selected: {tool_call.tool.value}",

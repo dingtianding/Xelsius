@@ -1,7 +1,6 @@
 import os
 
-import anthropic
-
+from app.agent.providers import get_provider, resolve_via_anthropic, resolve_via_gemini
 from app.models import ToolCall, ToolName
 
 _TOOLS = [
@@ -214,43 +213,16 @@ _SYSTEM_BASE = (
     "Do not explain — just call the tool."
 )
 
-_host_client: anthropic.Anthropic | None = None
-
-
-def _get_host_client() -> anthropic.Anthropic:
-    """Client using the app owner's API key (for free-tier visitors)."""
-    global _host_client
-    if _host_client is None:
-        key = os.environ.get("ANTHROPIC_API_KEY")
-        if not key:
-            raise RuntimeError("ANTHROPIC_API_KEY not set — cannot serve free-tier requests")
-        _host_client = anthropic.Anthropic(api_key=key)
-    return _host_client
-
-
-def _get_client(user_api_key: str | None = None) -> anthropic.Anthropic:
-    if user_api_key:
-        return anthropic.Anthropic(api_key=user_api_key)
-    return _get_host_client()
-
-
 def resolve_tool(prompt: str, user_api_key: str | None = None, context: str = "") -> ToolCall:
-    """Use Claude to map a natural-language prompt to a structured tool call."""
-    client = _get_client(user_api_key)
-
+    """Route a natural-language prompt to a structured tool call via LLM."""
     system = f"{_SYSTEM_BASE}\n\n{context}" if context else _SYSTEM_BASE
 
-    response = client.messages.create(
-        model=os.environ.get("XELSIUS_MODEL", "claude-haiku-4-5"),
-        max_tokens=256,
-        system=system,
-        tools=_TOOLS,
-        tool_choice={"type": "any"},
-        messages=[{"role": "user", "content": prompt}],
-    )
+    # BYOK Anthropic key always uses Claude
+    if user_api_key:
+        return resolve_via_anthropic(prompt, system, _TOOLS, api_key=user_api_key)
 
-    for block in response.content:
-        if block.type == "tool_use":
-            return ToolCall(tool=ToolName(block.name), args=block.input)
-
-    raise ValueError(f"Claude did not return a tool call for prompt: {prompt!r}")
+    provider = get_provider()
+    if provider == "gemini":
+        return resolve_via_gemini(prompt, system, _TOOLS)
+    else:
+        return resolve_via_anthropic(prompt, system, _TOOLS)
