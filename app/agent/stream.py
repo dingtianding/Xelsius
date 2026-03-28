@@ -21,6 +21,7 @@ def run_agent_streaming(
     audit_log: list[AuditEntry],
     on_step: StepCallback,
     user_api_key: str | None = None,
+    provider: str | None = None,
 ) -> tuple[ToolCall, Diff]:
     """Run the agent pipeline, calling on_step at each stage.
 
@@ -39,10 +40,10 @@ def run_agent_streaming(
     on_step("context_built", {"token_estimate": len(context.split())})
 
     # Step 2: Call LLM
-    provider = get_provider() if not user_api_key else "anthropic"
-    on_step("calling_llm", {"message": f"Asking {provider} to pick the best tool...", "provider": provider})
+    chosen = provider or (get_provider() if not user_api_key else "anthropic")
+    on_step("calling_llm", {"message": f"Asking {chosen} to pick the best tool...", "provider": chosen})
 
-    tool_call = resolve_tool(prompt, user_api_key=user_api_key, context=context)
+    tool_call = resolve_tool(prompt, user_api_key=user_api_key, context=context, provider=provider)
 
     on_step("tool_selected", {
         "message": f"Selected: {tool_call.tool.value}",

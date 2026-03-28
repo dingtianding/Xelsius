@@ -6,6 +6,7 @@ from starlette.responses import JSONResponse
 
 from app import ratelimit, sessions
 from app.agent.context import build_context
+from app.agent.providers import get_provider
 from app.agent.service import resolve_tool
 from app.agent.stream import run_agent_streaming
 from app.ingest import data as ingest_data
@@ -62,6 +63,20 @@ def create_session() -> dict:
     return {"session_id": session_id}
 
 
+@app.get("/providers")
+def list_providers() -> dict:
+    """List available LLM providers and which keys are configured."""
+    import os
+    return {
+        "default": get_provider(),
+        "available": [
+            {"id": "gemini", "name": "Gemini Flash", "free": True, "configured": bool(os.environ.get("GEMINI_API_KEY"))},
+            {"id": "groq", "name": "Groq Llama", "free": True, "configured": bool(os.environ.get("GROQ_API_KEY"))},
+            {"id": "anthropic", "name": "Claude Haiku", "free": False, "configured": bool(os.environ.get("ANTHROPIC_API_KEY"))},
+        ],
+    }
+
+
 # --- Agent ---
 
 
@@ -88,7 +103,7 @@ def agent_run(
     workpaper = session.adapter.get_workpaper()
     context = build_context(workpaper, session.audit_log)
     try:
-        tool_call = resolve_tool(req.prompt, user_api_key=user_key, context=context)
+        tool_call = resolve_tool(req.prompt, user_api_key=user_key, context=context, provider=req.provider)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
@@ -125,6 +140,7 @@ async def agent_ws(websocket: WebSocket):
             prompt = data.get("prompt", "")
             session_id = data.get("session_id")
             user_api_key = data.get("api_key")
+            provider = data.get("provider")
 
             if not prompt:
                 await websocket.send_json({"type": "error", "message": "Empty prompt"})
@@ -155,6 +171,7 @@ async def agent_ws(websocket: WebSocket):
                     audit_log=session.audit_log,
                     on_step=on_step,
                     user_api_key=user_api_key,
+                    provider=provider,
                 )
 
                 # Send all steps

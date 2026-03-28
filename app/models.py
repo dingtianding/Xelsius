@@ -228,6 +228,7 @@ class CellEditResponse(BaseModel):
 class RunRequest(BaseModel):
     prompt: str
     api_key: str | None = None
+    provider: str | None = None  # "gemini", "groq", or "anthropic" — overrides server default
 
 
 class RunResponse(BaseModel):

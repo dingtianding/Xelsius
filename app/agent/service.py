@@ -213,7 +213,12 @@ _SYSTEM_BASE = (
     "Do not explain — just call the tool."
 )
 
-def resolve_tool(prompt: str, user_api_key: str | None = None, context: str = "") -> ToolCall:
+def resolve_tool(
+    prompt: str,
+    user_api_key: str | None = None,
+    context: str = "",
+    provider: str | None = None,
+) -> ToolCall:
     """Route a natural-language prompt to a structured tool call via LLM."""
     system = f"{_SYSTEM_BASE}\n\n{context}" if context else _SYSTEM_BASE
 
@@ -221,10 +226,11 @@ def resolve_tool(prompt: str, user_api_key: str | None = None, context: str = ""
     if user_api_key:
         return resolve_via_anthropic(prompt, system, _TOOLS, api_key=user_api_key)
 
-    provider = get_provider()
-    if provider == "gemini":
+    # User-selected provider overrides server default
+    chosen = provider or get_provider()
+    if chosen == "gemini":
         return resolve_via_gemini(prompt, system, _TOOLS)
-    elif provider == "groq":
+    elif chosen == "groq":
         return resolve_via_groq(prompt, system, _TOOLS)
     else:
         return resolve_via_anthropic(prompt, system, _TOOLS)
