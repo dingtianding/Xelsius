@@ -158,36 +158,6 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Mode + Model selectors */}
-      <div className="flex items-center gap-3 px-4 py-2 border-b border-emerald-900/50">
-        <div className="flex bg-emerald-900/40 rounded-md p-0.5">
-          {(["agent", "chat"] as Mode[]).map((m) => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className={`px-3 py-1 text-xs font-medium rounded transition-colors capitalize ${
-                mode === m
-                  ? "bg-emerald-700 text-white"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
-        <select
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-          className="bg-emerald-900/40 border border-emerald-800/40 text-zinc-300 text-xs rounded px-2 py-1 focus:outline-none focus:border-emerald-600 cursor-pointer"
-        >
-          {MODELS.map((m) => (
-            <option key={m.id} value={m.id} className="bg-[#0a1f1a]">
-              {m.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
       {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-3">
         {messages.length === 0 ? (
@@ -374,6 +344,40 @@ export default function Sidebar({
                 />
                 <div className="flex items-center justify-between px-3 pb-2">
                   <div className="flex items-center gap-2">
+                    {/* Mode toggle */}
+                    <div className="flex bg-emerald-900/40 rounded-full p-0.5">
+                      {(["agent", "chat"] as Mode[]).map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setMode(m)}
+                          className={`px-2.5 py-0.5 text-[11px] font-medium rounded-full transition-colors capitalize ${
+                            mode === m
+                              ? "bg-emerald-700 text-white"
+                              : "text-zinc-500 hover:text-zinc-200"
+                          }`}
+                        >
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Model selector */}
+                    <select
+                      value={model}
+                      onChange={(e) => setModel(e.target.value)}
+                      className="bg-transparent border-none text-zinc-400 text-xs focus:outline-none cursor-pointer"
+                    >
+                      {MODELS.map((m) => (
+                        <option key={m.id} value={m.id} className="bg-[#0a1f1a]">
+                          {m.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {/* Attach file */}
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
@@ -384,17 +388,7 @@ export default function Sidebar({
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                       </svg>
                     </button>
-                    <span className="text-xs text-zinc-500">
-                      Enter to send
-                    </span>
                   </div>
-                  <button
-                    type="submit"
-                    disabled={(isLoading || isUploading) || (!input.trim() && !attachedFile)}
-                    className="px-3 py-1.5 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-600 disabled:bg-emerald-900/50 disabled:text-zinc-500 rounded transition-colors"
-                  >
-                    {isLoading || isUploading ? "..." : "Send"}
-                  </button>
                 </div>
               </>
             )}
