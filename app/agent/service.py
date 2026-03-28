@@ -213,24 +213,51 @@ _SYSTEM_BASE = (
     "Do not explain — just call the tool."
 )
 
+_PROVIDER_FNS = {
+    "gemini": resolve_via_gemini,
+    "groq": resolve_via_groq,
+    "anthropic": resolve_via_anthropic,
+}
+
+# Fallback order when a provider fails
+_FALLBACK_ORDER = ["groq", "gemini", "anthropic"]
+
+
 def resolve_tool(
     prompt: str,
     user_api_key: str | None = None,
     context: str = "",
     provider: str | None = None,
 ) -> ToolCall:
-    """Route a natural-language prompt to a structured tool call via LLM."""
+    """Route a natural-language prompt to a structured tool call via LLM.
+
+    Auto-fallback: if the chosen provider fails, tries the next configured one.
+    """
+    import os
+
     system = f"{_SYSTEM_BASE}\n\n{context}" if context else _SYSTEM_BASE
 
-    # BYOK Anthropic key always uses Claude
+    # BYOK Anthropic key always uses Claude (no fallback)
     if user_api_key:
         return resolve_via_anthropic(prompt, system, _TOOLS, api_key=user_api_key)
 
-    # User-selected provider overrides server default
+    # Build try order: chosen provider first, then fallbacks
     chosen = provider or get_provider()
-    if chosen == "gemini":
-        return resolve_via_gemini(prompt, system, _TOOLS)
-    elif chosen == "groq":
-        return resolve_via_groq(prompt, system, _TOOLS)
-    else:
-        return resolve_via_anthropic(prompt, system, _TOOLS)
+    order = [chosen] + [p for p in _FALLBACK_ORDER if p != chosen]
+
+    # Only try providers that have keys configured
+    key_env = {"gemini": "GEMINI_API_KEY", "groq": "GROQ_API_KEY", "anthropic": "ANTHROPIC_API_KEY"}
+    available = [p for p in order if os.environ.get(key_env.get(p, ""))]
+
+    if not available:
+        raise RuntimeError("No LLM provider configured. Set GROQ_API_KEY, GEMINI_API_KEY, or ANTHROPIC_API_KEY.")
+
+    errors: list[str] = []
+    for p in available:
+        try:
+            return _PROVIDER_FNS[p](prompt, system, _TOOLS)
+        except Exception as exc:
+            errors.append(f"{p}: {exc}")
+            continue
+
+    raise RuntimeError(f"All LLM providers failed: {'; '.join(errors)}")

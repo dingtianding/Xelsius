@@ -106,6 +106,10 @@ def agent_run(
         tool_call = resolve_tool(req.prompt, user_api_key=user_key, context=context, provider=req.provider)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"LLM provider error: {exc}")
 
     diff = execute(tool_call.tool, workpaper, tool_call.args)
 
