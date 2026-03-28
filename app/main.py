@@ -23,6 +23,11 @@ from app.tools import categorize as _categorize_reg  # noqa: F401 — registers 
 from app.tools import anomalies as _anomalies_reg  # noqa: F401
 from app.tools import summary as _summary_reg  # noqa: F401
 from app.tools import reset as _reset_reg  # noqa: F401
+from app.tools import trial_balance as _tb_reg  # noqa: F401
+from app.tools import materiality as _mat_reg  # noqa: F401
+from app.tools import lead_sheet as _ls_reg  # noqa: F401
+from app.tools import adjusting as _adj_reg  # noqa: F401
+from app.tools import tickmarks as _tm_reg  # noqa: F401
 from app.tools.registry import execute
 
 app = FastAPI(title="Xelsius", version="0.1.0")

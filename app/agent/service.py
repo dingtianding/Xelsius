@@ -71,6 +71,139 @@ _TOOLS = [
             "required": [],
         },
     },
+    # --- Audit tools ---
+    {
+        "name": ToolName.BUILD_TRIAL_BALANCE.value,
+        "description": (
+            "Build a trial balance from the workpaper's accounts. Shows all accounts "
+            "with debit/credit classification, prior year balances, and balanced totals. "
+            "Use when the user wants to see the trial balance or TB."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": ToolName.COMPUTE_MATERIALITY.value,
+        "description": (
+            "Compute tiered audit materiality (overall, performance, trivial) from "
+            "account balances. Use when the user wants to set or calculate materiality."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "basis": {
+                    "type": "string",
+                    "description": "The financial metric to base materiality on.",
+                    "enum": ["revenue", "total_assets", "net_income"],
+                    "default": "revenue",
+                },
+                "percentage": {
+                    "type": "number",
+                    "description": "Override percentage for overall materiality (e.g. 0.05 for 5%).",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": ToolName.BUILD_LEAD_SHEET.value,
+        "description": (
+            "Build a lead sheet — summary by account type with current balance, "
+            "prior year comparison, variance, and materiality flags. "
+            "Use when the user wants to see the lead sheet or account summary."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": ToolName.PROPOSE_ADJUSTING_ENTRY.value,
+        "description": (
+            "Propose a balanced adjusting journal entry (debit = credit). "
+            "Use when the user wants to record an audit adjustment."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "description": "Description of the adjustment.",
+                },
+                "debit_account": {
+                    "type": "string",
+                    "description": "Account number to debit.",
+                },
+                "credit_account": {
+                    "type": "string",
+                    "description": "Account number to credit.",
+                },
+                "amount": {
+                    "type": "number",
+                    "description": "Amount of the adjustment.",
+                },
+                "date": {
+                    "type": "string",
+                    "description": "Date of the adjustment (ISO format).",
+                },
+            },
+            "required": ["description", "debit_account", "credit_account", "amount"],
+        },
+    },
+    {
+        "name": ToolName.ADD_TICKMARK.value,
+        "description": (
+            "Attach an audit tickmark symbol to a specific cell in the workpaper. "
+            "Symbols: ✓ (verified), ◊ (agreed to source), △ (recalculated), "
+            "✗ (exception), ○ (no exception). Use when the user wants to mark "
+            "an item as tested."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "tab": {
+                    "type": "string",
+                    "description": "The workpaper tab name.",
+                    "enum": ["trial_balance", "lead_sheet", "adjusting_entries", "detail_testing"],
+                },
+                "row": {
+                    "type": "integer",
+                    "description": "Row index.",
+                },
+                "column": {
+                    "type": "string",
+                    "description": "Column name.",
+                },
+                "symbol": {
+                    "type": "string",
+                    "description": "Tickmark symbol.",
+                    "enum": ["✓", "◊", "△", "✗", "○"],
+                },
+                "note": {
+                    "type": "string",
+                    "description": "Optional note explaining the tickmark.",
+                },
+            },
+            "required": ["tab", "row", "column", "symbol"],
+        },
+    },
+    {
+        "name": ToolName.GENERATE_TICKMARK_LEGEND.value,
+        "description": (
+            "Generate a tickmark legend showing all symbols, their descriptions, "
+            "and how many times each has been used. Use when the user wants to "
+            "see the tickmark legend or summary of audit marks."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
 ]
 
 _SYSTEM_BASE = (

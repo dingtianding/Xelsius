@@ -176,6 +176,95 @@ def test_direct_tool_invalid_name():
     assert resp.status_code == 422
 
 
+# --- Audit tools via /tools/run ---
+
+
+def test_api_build_trial_balance():
+    resp = client.post("/tools/run", json={"tool": "build_trial_balance", "args": {}})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["diff"]["type"] == "create_sheet"
+    assert data["diff"]["name"] == "Trial Balance"
+    assert len(data["diff"]["data"]) > 0
+    # Last row should be totals
+    assert data["diff"]["data"][-1]["account_name"] == "TOTALS"
+
+
+def test_api_compute_materiality():
+    resp = client.post("/tools/run", json={
+        "tool": "compute_materiality",
+        "args": {"basis": "revenue"},
+    })
+    assert resp.status_code == 200
+    config = resp.json()["diff"]["config"]
+    assert config["basis"] == "revenue"
+    assert config["overall"] > 0
+    assert config["performance"] > 0
+    assert config["trivial"] > 0
+    assert config["performance"] < config["overall"]
+    assert config["trivial"] < config["performance"]
+
+
+def test_api_build_lead_sheet():
+    resp = client.post("/tools/run", json={"tool": "build_lead_sheet", "args": {}})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["diff"]["name"] == "Lead Sheet"
+    # Should have subtotal rows
+    subtotals = [r for r in data["diff"]["data"] if r["account_number"] == ""]
+    assert len(subtotals) >= 1
+
+
+def test_api_propose_adjusting_entry():
+    resp = client.post("/tools/run", json={
+        "tool": "propose_adjusting_entry",
+        "args": {
+            "description": "Accrue wages",
+            "debit_account": "5100",
+            "credit_account": "2100",
+            "amount": 15000,
+            "date": "2026-03-31",
+        },
+    })
+    assert resp.status_code == 200
+    entries = resp.json()["diff"]["entries"]
+    assert len(entries) == 2
+    assert entries[0]["debit"] == 15000
+    assert entries[1]["credit"] == 15000
+
+
+def test_api_add_tickmark():
+    resp = client.post("/tools/run", json={
+        "tool": "add_tickmark",
+        "args": {
+            "tab": "trial_balance",
+            "row": 0,
+            "column": "balance",
+            "symbol": "✓",
+            "note": "Traced to GL",
+        },
+    })
+    assert resp.status_code == 200
+    assert resp.json()["diff"]["tickmarks"][0]["symbol"] == "✓"
+
+
+def test_api_generate_tickmark_legend():
+    resp = client.post("/tools/run", json={"tool": "generate_tickmark_legend", "args": {}})
+    assert resp.status_code == 200
+    assert resp.json()["diff"]["name"] == "Tickmark Legend"
+    assert len(resp.json()["diff"]["data"]) == 5  # all 5 symbols
+
+
+def test_api_get_workpaper():
+    resp = client.get("/workpaper")
+    assert resp.status_code == 200
+    wp = resp.json()
+    assert "transactions" in wp
+    assert "accounts" in wp
+    assert "tickmarks" in wp
+    assert "materiality" in wp
+
+
 # --- GET /audit/log ---
 
 
