@@ -6,7 +6,7 @@ interface Suggestion {
 }
 
 export function getSuggestions(transactions: Transaction[]): Suggestion[] {
-  if (transactions.length === 0) return [];
+  if (!transactions || transactions.length === 0) return [];
 
   const suggestions: Suggestion[] = [];
 
