@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
-import type { AuditEntry, CellChange, Diff } from "@/lib/types";
+import { useMemo, useRef, useState } from "react";
+import type { AuditEntry, CellChange, Diff, Transaction } from "@/lib/types";
+import { getSuggestions } from "@/lib/suggestions";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -23,6 +24,7 @@ interface SidebarProps {
   auditLog: AuditEntry[];
   onFileUpload: (file: File) => void;
   isUploading: boolean;
+  transactions: Transaction[];
 }
 
 type Mode = "agent" | "chat";
@@ -51,6 +53,7 @@ export default function Sidebar({
   onRejectAll,
   onFileUpload,
   isUploading,
+  transactions,
 }: SidebarProps) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -59,6 +62,8 @@ export default function Sidebar({
   const [isDragOver, setIsDragOver] = useState(false);
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const suggestions = useMemo(() => getSuggestions(transactions), [transactions]);
 
   const changeCount =
     pendingDiff?.type === "update_cells"
@@ -164,17 +169,15 @@ export default function Sidebar({
           <div className="flex flex-col items-center justify-center h-full text-center gap-5">
             <div className="w-full">
               <div className="flex flex-col gap-1.5">
-                {[
-                  "Categorize all transactions",
-                  "Summarize by category",
-                  "Highlight transactions over $1000",
-                ].map((suggestion) => (
+                {suggestions.map((s) => (
                   <button
-                    key={suggestion}
-                    onClick={() => setInput(suggestion)}
+                    key={s.prompt}
+                    onClick={() => {
+                      setInput(s.prompt);
+                    }}
                     className="text-left text-sm text-zinc-300 hover:text-zinc-200 hover:bg-emerald-900/30 rounded-md px-3 py-2.5 transition-colors border border-emerald-900/30 hover:border-emerald-700/50 cursor-pointer"
                   >
-                    {suggestion}
+                    {s.label}
                   </button>
                 ))}
               </div>

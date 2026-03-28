@@ -194,6 +194,7 @@ export default function Home() {
           auditLog={auditLog}
           onFileUpload={handleFileUpload}
           isUploading={isUploading}
+          transactions={transactions}
         />
       </div>
     </div>
