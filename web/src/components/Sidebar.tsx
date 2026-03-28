@@ -61,6 +61,7 @@ export default function Sidebar({
   const [model, setModel] = useState("auto");
   const [isDragOver, setIsDragOver] = useState(false);
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [askBeforeEdits, setAskBeforeEdits] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -85,7 +86,6 @@ export default function Sidebar({
       prev.map((t) => {
         if (t.id !== activeTabId) return t;
         const newMessages = typeof updater === "function" ? updater(t.messages) : updater;
-        // Auto-name tab from first user message
         const name = t.name === "New Chat" && newMessages.length > 0
           ? (newMessages.find((m) => m.role === "user")?.content.slice(0, 20) ?? "New Chat")
           : t.name;
@@ -105,16 +105,14 @@ export default function Sidebar({
       const next = prev.filter((t) => t.id !== id);
       if (next.length === 0) {
         const newId = String(nextTabId.current++);
+        setActiveTabId(newId);
         return [{ id: newId, name: "New Chat", messages: [] }];
+      }
+      if (activeTabId === id) {
+        setActiveTabId(next[0].id);
       }
       return next;
     });
-    if (activeTabId === id) {
-      setTabs((prev) => {
-        setActiveTabId(prev[0]?.id ?? "1");
-        return prev;
-      });
-    }
   }
 
   const feSuggestions = useMemo(() => getSuggestions(transactions), [transactions]);
@@ -141,7 +139,6 @@ export default function Sidebar({
         ? pendingDiff.data.length
         : 0;
 
-  // Scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading, isUploading]);
@@ -178,7 +175,6 @@ export default function Sidebar({
     }, 100);
   }
 
-  // Update last assistant message when diff arrives
   if (
     pendingDiff &&
     messages.length > 0 &&
@@ -232,41 +228,62 @@ export default function Sidebar({
               <span className="truncate max-w-[100px]">{tab.name}</span>
               {tabs.length > 1 && (
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeTab(tab.id);
-                  }}
+                  onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
                   className="text-zinc-600 hover:text-zinc-300 ml-0.5"
-                >
-                  &times;
-                </button>
+                >&times;</button>
               )}
             </div>
           ))}
         </div>
         <div className="flex items-center gap-1.5 px-2 shrink-0">
-          <button
-            onClick={addTab}
-            className="text-zinc-500 hover:text-zinc-300 text-sm"
-            title="New chat"
-          >+</button>
+          <button onClick={addTab} className="text-zinc-500 hover:text-zinc-300 text-sm" title="New chat">+</button>
           <button className="text-zinc-500 hover:text-zinc-300 text-xs">···</button>
         </div>
       </div>
 
-      {/* Messages — column-reverse so latest is at top */}
+      {/* Model selector row — Claude in Excel style */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-emerald-900/50">
+        <div className="flex items-center gap-2">
+          <select
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            className="bg-emerald-900/40 border border-emerald-700/40 text-white text-xs font-medium rounded-full px-3 py-1 focus:outline-none cursor-pointer"
+          >
+            {MODELS.map((m) => (
+              <option key={m.id} value={m.id} className="bg-[#0a1f1a]">{m.label}</option>
+            ))}
+          </select>
+          <span className="text-[10px] text-emerald-600 font-medium uppercase tracking-wider">Beta</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="text-zinc-500 hover:text-zinc-300" title="History">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
+          <button className="text-zinc-500 hover:text-zinc-300" title="Settings">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Messages area */}
       <div className="flex-1 overflow-y-auto flex flex-col-reverse">
         <div ref={messagesEndRef} />
 
-        {/* Suggestions at the bottom (visually top in reverse) when no messages */}
+        {/* Empty state — centered suggestions like Claude in Excel */}
         {messages.length === 0 && (
-          <div className="px-4 py-4">
-            <div className="flex flex-col gap-1.5">
+          <div className="flex-1 flex flex-col items-center justify-center px-6">
+            <p className="text-sm text-zinc-500 mb-6">Take actions in your workpaper</p>
+            <div className="flex flex-col items-center gap-2.5 w-full max-w-[220px]">
               {suggestions.map((s) => (
                 <button
                   key={s.prompt}
                   onClick={() => setInput(s.prompt)}
-                  className="text-left text-sm text-zinc-400 hover:text-zinc-200 hover:bg-emerald-900/30 rounded-md px-3 py-2 transition-colors cursor-pointer"
+                  className="w-full text-sm text-zinc-300 hover:text-white border border-emerald-800/40 hover:border-emerald-600 rounded-full px-4 py-2 transition-colors cursor-pointer text-center"
                 >
                   {s.label}
                 </button>
@@ -276,83 +293,85 @@ export default function Sidebar({
         )}
 
         {/* Messages */}
-        <div className="flex flex-col gap-0.5 px-4 py-3">
-          {messages.map((msg, i) => (
-            <div key={i} className="py-2">
-              {msg.role === "user" ? (
-                <div>
-                  {msg.fileName && (
-                    <div className="flex items-center gap-1.5 mb-1 text-xs text-emerald-400">
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                      </svg>
-                      {msg.fileName}
-                    </div>
-                  )}
-                  <p className="text-sm text-white font-medium">{msg.content}</p>
-                </div>
-              ) : (
-                <div className="border-l-2 border-emerald-700/50 pl-3">
-                  <p className="text-sm text-zinc-300">{msg.content}</p>
+        {messages.length > 0 && (
+          <div className="flex flex-col gap-0.5 px-4 py-3">
+            {messages.map((msg, i) => (
+              <div key={i} className="py-2">
+                {msg.role === "user" ? (
+                  <div>
+                    {msg.fileName && (
+                      <div className="flex items-center gap-1.5 mb-1 text-xs text-emerald-400">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                        </svg>
+                        {msg.fileName}
+                      </div>
+                    )}
+                    <p className="text-sm text-white font-medium">{msg.content}</p>
+                  </div>
+                ) : (
+                  <div className="border-l-2 border-emerald-700/50 pl-3">
+                    <p className="text-sm text-zinc-300">{msg.content}</p>
 
-                  {msg.diff && i === messages.length - 1 && pendingDiff && (
-                    <div className="flex gap-2 mt-2">
-                      <button
-                        onClick={onAcceptAll}
-                        className="px-3 py-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded transition-colors"
-                      >
-                        Accept
-                      </button>
-                      <button
-                        onClick={onRejectAll}
-                        className="px-3 py-1 text-xs font-medium text-zinc-300 hover:text-white transition-colors"
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  )}
+                    {msg.diff && i === messages.length - 1 && pendingDiff && (
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          onClick={onAcceptAll}
+                          className="px-3 py-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded transition-colors"
+                        >
+                          Accept
+                        </button>
+                        <button
+                          onClick={onRejectAll}
+                          className="px-3 py-1 text-xs font-medium text-zinc-300 hover:text-white transition-colors"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    )}
 
-                  {msg.diff?.type === "create_sheet" && (
-                    <div className="mt-2 max-h-32 overflow-y-auto rounded border border-emerald-900/40">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="bg-emerald-900/30 text-zinc-400">
-                            {Object.keys(msg.diff.data[0] ?? {}).map((key) => (
-                              <th key={key} className="px-2 py-1 text-left font-medium">{key}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-emerald-900/30">
-                          {msg.diff.data.map((row, ri) => (
-                            <tr key={ri} className="text-zinc-300">
-                              {Object.values(row).map((val, ci) => (
-                                <td key={ci} className="px-2 py-1 font-mono">
-                                  {typeof val === "number"
-                                    ? val.toLocaleString("en-US", { style: "currency", currency: "USD" })
-                                    : val}
-                                </td>
+                    {msg.diff?.type === "create_sheet" && (
+                      <div className="mt-2 max-h-32 overflow-y-auto rounded border border-emerald-900/40">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-emerald-900/30 text-zinc-400">
+                              {Object.keys(msg.diff.data[0] ?? {}).map((key) => (
+                                <th key={key} className="px-2 py-1 text-left font-medium">{key}</th>
                               ))}
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-
-          {(isLoading || isUploading) && (
-            <div className="py-2 border-l-2 border-emerald-700/50 pl-3">
-              <div className="flex gap-1">
-                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                          </thead>
+                          <tbody className="divide-y divide-emerald-900/30">
+                            {msg.diff.data.map((row, ri) => (
+                              <tr key={ri} className="text-zinc-300">
+                                {Object.values(row).map((val, ci) => (
+                                  <td key={ci} className="px-2 py-1 font-mono">
+                                    {typeof val === "number"
+                                      ? val.toLocaleString("en-US", { style: "currency", currency: "USD" })
+                                      : val}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
-        </div>
+            ))}
+
+            {(isLoading || isUploading) && (
+              <div className="py-2 border-l-2 border-emerald-700/50 pl-3">
+                <div className="flex gap-1">
+                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {error && (
           <div className="mx-4 mb-2 text-xs text-red-400 bg-red-400/10 border border-red-400/20 rounded px-3 py-2">
@@ -361,7 +380,7 @@ export default function Sidebar({
         )}
       </div>
 
-      {/* Input at bottom */}
+      {/* Input — Claude in Excel style */}
       <div className="px-3 py-3 border-t border-emerald-900/50">
         <form onSubmit={handleSubmit}>
           <div
@@ -373,7 +392,7 @@ export default function Sidebar({
               const file = e.dataTransfer.files[0];
               if (file) handleFileDrop(file);
             }}
-            className={`bg-[#0d2a22] border rounded-lg overflow-hidden transition-colors ${
+            className={`bg-[#0d2a22] border rounded-xl overflow-hidden transition-colors ${
               isDragOver
                 ? "border-emerald-500 bg-emerald-900/30"
                 : "border-emerald-800/40 focus-within:border-emerald-600"
@@ -409,46 +428,48 @@ export default function Sidebar({
                       handleSubmit(e);
                     }
                   }}
-                  placeholder={attachedFile ? "Press Enter to upload..." : "Plan, @ for context, / for commands"}
+                  placeholder="What can I do for you?"
                   disabled={isLoading || isUploading}
-                  rows={3}
+                  rows={2}
                   className="w-full px-3 pt-2.5 pb-1 bg-transparent text-sm text-white placeholder:text-zinc-500 focus:outline-none resize-none disabled:opacity-50"
                 />
                 <div className="flex items-center justify-between px-3 pb-2">
                   <div className="flex items-center gap-2">
-                    <div className="flex bg-emerald-900/40 rounded-full p-0.5">
-                      {(["agent", "chat"] as Mode[]).map((m) => (
-                        <button
-                          key={m}
-                          type="button"
-                          onClick={() => setMode(m)}
-                          className={`px-2.5 py-0.5 text-[11px] font-medium rounded-full transition-colors capitalize ${
-                            mode === m ? "bg-emerald-700 text-white" : "text-zinc-500 hover:text-zinc-200"
-                          }`}
-                        >
-                          {m}
-                        </button>
-                      ))}
-                    </div>
-                    <select
-                      value={model}
-                      onChange={(e) => setModel(e.target.value)}
-                      className="bg-transparent border-none text-zinc-400 text-xs focus:outline-none cursor-pointer"
+                    {/* Ask before edits toggle */}
+                    <button
+                      type="button"
+                      onClick={() => setAskBeforeEdits(!askBeforeEdits)}
+                      className={`flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 transition-colors ${
+                        askBeforeEdits
+                          ? "text-emerald-400 bg-emerald-900/40"
+                          : "text-zinc-500"
+                      }`}
                     >
-                      {MODELS.map((m) => (
-                        <option key={m.id} value={m.id} className="bg-[#0a1f1a]">{m.label}</option>
-                      ))}
-                    </select>
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                      Ask before edits
+                    </button>
                   </div>
-                  <div className="flex items-center gap-2">
+
+                  <div className="flex items-center gap-1.5">
+                    {/* Attach file */}
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="text-zinc-500 hover:text-zinc-300 transition-colors"
+                      className="w-7 h-7 flex items-center justify-center rounded-full text-zinc-500 hover:text-zinc-300 hover:bg-emerald-900/30 transition-colors"
                       title="Attach file"
                     >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                      +
+                    </button>
+                    {/* Send */}
+                    <button
+                      type="submit"
+                      disabled={(isLoading || isUploading) || (!input.trim() && !attachedFile)}
+                      className="w-7 h-7 flex items-center justify-center rounded-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900/50 disabled:text-zinc-600 text-white transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
                       </svg>
                     </button>
                   </div>
