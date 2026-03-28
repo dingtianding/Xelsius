@@ -109,13 +109,20 @@ export default function SpreadsheetGrid({
       },
     });
 
-    // Style header
+    // Style — 10-K / SEC filing format
     const sheet = univerAPI.getActiveWorkbook()?.getActiveSheet();
     if (sheet) {
+      // Set all cells to Times New Roman (serif)
+      const allRange = sheet.getRange(0, 0, transactions.length + 5, 4);
+      allRange?.setFontFamily("Times New Roman");
+      allRange?.setFontSize(11);
+
+      // Header row: bold, bottom border style, light gray bg
       const headerRange = sheet.getRange(0, 0, 1, 4);
-      headerRange?.setBackgroundColor("#18181b");
       headerRange?.setFontWeight("bold");
-      headerRange?.setFontColor("#a1a1aa");
+      headerRange?.setFontColor("#000000");
+      headerRange?.setBackgroundColor("#f2f2f2");
+      headerRange?.setFontSize(11);
     }
 
     // Listen for user edits (not our programmatic updates)
@@ -183,12 +190,12 @@ export default function SpreadsheetGrid({
         const change = changeMap.get(`${i}:${field}`);
         if (change) {
           range.setValue(change.after);
-          range.setBackgroundColor("#854d0e");
-          range.setFontColor("#fef08a");
+          range.setBackgroundColor("#ecfccb");
+          range.setFontColor("#365314");
         } else {
           range.setValue(value);
-          range.setBackgroundColor(null);
-          range.setFontColor("#e4e4e7");
+          range.setBackgroundColor("#ffffff");
+          range.setFontColor("#000000");
         }
       }
     }
@@ -243,8 +250,8 @@ export default function SpreadsheetGrid({
           className="absolute z-50 animate-in fade-in"
           style={{ top: popupPos.top, left: popupPos.left }}
         >
-          <div className="flex items-center gap-1.5 bg-[#1c1208] border border-amber-500/50 rounded-lg shadow-xl shadow-black/50 px-2.5 py-1.5">
-            <span className="text-xs text-amber-400 font-medium mr-1">
+          <div className="flex items-center gap-1.5 bg-white border border-zinc-300 rounded-lg shadow-lg shadow-black/10 px-2.5 py-1.5">
+            <span className="text-xs text-zinc-700 font-medium mr-1">
               {pendingChanges.length} change{pendingChanges.length !== 1 ? "s" : ""}
             </span>
             <button
@@ -258,7 +265,7 @@ export default function SpreadsheetGrid({
             </button>
             <button
               onClick={() => pendingChanges.forEach((c) => onRejectChange(c))}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-zinc-300 bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 rounded transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-zinc-600 bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 rounded transition-colors"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

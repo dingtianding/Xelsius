@@ -4,11 +4,3 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
-
-/* Univer dark theme overrides */
-.univer-app {
-  --univer-bg-color: #0c0c0c;
-  --univer-bg-color-secondary: #18181b;
-  --univer-text-color: #e4e4e7;
-  --univer-border-color: #27272a;
-}
