@@ -202,7 +202,7 @@ export default function Sidebar({
                   <button
                     key={suggestion}
                     onClick={() => setInput(suggestion)}
-                    className="text-left text-sm text-zinc-300 hover:text-zinc-200 hover:bg-emerald-900/30 rounded-md px-3 py-2.5 transition-colors border border-emerald-900/30 hover:border-emerald-700/50"
+                    className="text-left text-sm text-zinc-300 hover:text-zinc-200 hover:bg-emerald-900/30 rounded-md px-3 py-2.5 transition-colors border border-emerald-900/30 hover:border-emerald-700/50 cursor-pointer"
                   >
                     {suggestion}
                   </button>
