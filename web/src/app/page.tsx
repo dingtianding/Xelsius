@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import SpreadsheetGrid from "@/components/SpreadsheetGrid";
 import Sidebar from "@/components/Sidebar";
 import { runAgent, uploadFile, proposeCellEdit, applyDiff } from "@/lib/api";
