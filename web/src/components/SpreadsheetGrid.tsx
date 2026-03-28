@@ -187,7 +187,7 @@ export default function SpreadsheetGrid({
           range.setFontColor("#fef08a");
         } else {
           range.setValue(value);
-          range.setBackgroundColor("#000000");
+          range.setBackgroundColor(null);
           range.setFontColor("#e4e4e7");
         }
       }
